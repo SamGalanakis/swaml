@@ -5,14 +5,18 @@ import Foundation
 import SWAML
 
 /// Global BAML client instance
-/// Configure with environment variables or call `configureBaml()` before use
+/// Configure with environment variables or call `Baml.configure()` before use
 public enum Baml {
     private static var _client: BamlAsyncClient?
     private static var _runtime: BamlRuntime?
+    private static let lock = NSLock()
 
     /// The shared async client instance
     public static var client: BamlAsyncClient {
         get async {
+            lock.lock()
+            defer { lock.unlock() }
+
             if _client == nil {
                 await configure()
             }
@@ -28,32 +32,40 @@ public enum Baml {
 {% for config in client_configs %}
         await registry.register(
             name: "{{ config.name }}",
-            provider: {{ config|provider_init }},
+            provider: {{ config.provider_init() }},
             model: "{{ config.model }}",
             isDefault: {% if loop.first %}true{% else %}false{% endif %}
         )
 {% endfor %}
 
+        lock.lock()
         _runtime = BamlRuntime(clientRegistry: registry)
         _client = BamlAsyncClient(runtime: _runtime!)
+        lock.unlock()
     }
 
     /// Configure with a custom runtime
     public static func configure(runtime: BamlRuntime) {
+        lock.lock()
         _runtime = runtime
         _client = BamlAsyncClient(runtime: runtime)
+        lock.unlock()
     }
 
     /// Configure with a custom client registry
     public static func configure(clientRegistry: ClientRegistry) {
+        lock.lock()
         _runtime = BamlRuntime(clientRegistry: clientRegistry)
         _client = BamlAsyncClient(runtime: _runtime!)
+        lock.unlock()
     }
 
     /// Reset the global client (useful for testing)
     public static func reset() {
+        lock.lock()
         _client = nil
         _runtime = nil
+        lock.unlock()
     }
 }
 
@@ -71,5 +83,28 @@ extension Baml {
             throw BamlError.configurationError("Missing required environment variable: \(name)")
         }
         return key
+    }
+}
+
+// MARK: - Error Types
+
+/// Errors that can occur during BAML operations
+public enum BamlError: Error, LocalizedError {
+    case configurationError(String)
+    case runtimeError(String)
+    case parsingError(String)
+    case networkError(Error)
+
+    public var errorDescription: String? {
+        switch self {
+        case .configurationError(let message):
+            return "BAML Configuration Error: \(message)"
+        case .runtimeError(let message):
+            return "BAML Runtime Error: \(message)"
+        case .parsingError(let message):
+            return "BAML Parsing Error: \(message)"
+        case .networkError(let error):
+            return "BAML Network Error: \(error.localizedDescription)"
+        }
     }
 }

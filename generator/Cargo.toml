@@ -7,14 +7,12 @@ license = "MIT"
 repository = "https://github.com/boundaryml/baml"
 
 [dependencies]
-# BAML internal dependencies (paths are relative to BAML repo structure)
-# When integrating with BAML, update these paths:
-# internal-baml-core = { path = "../../baml-lib/baml-core" }
-# baml-types = { path = "../../baml-lib/baml-types" }
-# internal-baml-codegen = { path = "../codegen" }
+# BAML dependencies via git (optional feature for direct IR integration)
+baml-types = { git = "https://github.com/BoundaryML/baml", package = "baml-types", optional = true }
+internal-baml-core = { git = "https://github.com/BoundaryML/baml", package = "internal-baml-core", optional = true }
 
 # Template engine
-askama = { version = "0.12", features = ["with-serde-json"] }
+askama = "0.12"
 
 # Error handling
 anyhow = "1.0"
@@ -31,5 +29,12 @@ indexmap = { version = "2.0", features = ["serde"] }
 heck = "0.5"
 either = "1.9"
 
+# Logging
+log = "0.4"
+
 [dev-dependencies]
 pretty_assertions = "1.4"
+
+[features]
+default = []
+baml-ir = ["baml-types", "internal-baml-core"]

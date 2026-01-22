@@ -7,47 +7,88 @@ import SWAML
 // MARK: - Enums
 {% for e in enums %}
 
-{% if e.doc.is_some() %}
-/// {{ e.doc.as_ref().unwrap() }}
+{% if e.docstring.is_some() %}
+/// {{ e.docstring.as_ref().unwrap() }}
 {% endif %}
-public enum {{ e.name }}: String, Codable, Sendable, CaseIterable {
+public enum {{ e.name }}: String, Codable, Sendable, CaseIterable, Equatable {
 {% for value in e.values %}
-{% if value.doc.is_some() %}
-    /// {{ value.doc.as_ref().unwrap() }}
+{% if value.docstring.is_some() %}
+    /// {{ value.docstring.as_ref().unwrap() }}
 {% endif %}
-{% if value.alias.is_some() %}
-    case {{ value.name|lower }} = "{{ value.alias.as_ref().unwrap() }}"
+{% if value.needs_raw_value() %}
+    case {{ value.name }} = "{{ value.raw_value() }}"
 {% else %}
-    case {{ value.name|lower }}
+    case {{ value.name }}
 {% endif %}
 {% endfor %}
+{% if e.dynamic %}
+
+    /// Unknown value for forward compatibility
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = {{ e.name }}(rawValue: rawValue) ?? .unknown(rawValue)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .unknown(let value):
+            try container.encode(value)
+        default:
+            try container.encode(rawValue)
+        }
+    }
+{% endif %}
 }
 {% endfor %}
 
 // MARK: - Classes
 {% for class in classes %}
 
-{% if class.doc.is_some() %}
-/// {{ class.doc.as_ref().unwrap() }}
+{% if class.docstring.is_some() %}
+/// {{ class.docstring.as_ref().unwrap() }}
 {% endif %}
 public struct {{ class.name }}: Codable, Sendable, Equatable {
 {% for field in class.fields %}
-{% if field.doc.is_some() %}
-    /// {{ field.doc.as_ref().unwrap() }}
+{% if field.docstring.is_some() %}
+    /// {{ field.docstring.as_ref().unwrap() }}
 {% endif %}
-    public let {{ field.name }}: {{ field.field_type|swift_type }}
+    public let {{ field.name }}: {{ field.type_string() }}
 {% endfor %}
-{% if class.fields.iter().any(|f| f.name.contains('_')) %}
+{% if class.needs_coding_keys() %}
 
     private enum CodingKeys: String, CodingKey {
 {% for field in class.fields %}
-{% if field.name.contains('_') %}
-        case {{ field.name|camel_case }} = "{{ field.name }}"
+{% if field.baml_name != field.name %}
+        case {{ field.name }} = "{{ field.baml_name }}"
 {% else %}
         case {{ field.name }}
 {% endif %}
 {% endfor %}
     }
 {% endif %}
+
+    public init(
+{% for field in class.fields %}
+        {{ field.name }}: {{ field.type_string() }}{% if !loop.last %},{% endif %}
+
+{% endfor %}
+    ) {
+{% for field in class.fields %}
+        self.{{ field.name }} = {{ field.name }}
+{% endfor %}
+    }
 }
+{% endfor %}
+
+// MARK: - Type Aliases
+{% for alias in type_aliases %}
+
+{% if alias.docstring.is_some() %}
+/// {{ alias.docstring.as_ref().unwrap() }}
+{% endif %}
+public typealias {{ alias.name }} = {{ alias.target_type_string() }}
 {% endfor %}

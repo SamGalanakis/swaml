@@ -13,35 +13,53 @@ public actor BamlAsyncClient {
     }
 {% for func in functions %}
 
-{% if func.doc.is_some() %}
-    /// {{ func.doc.as_ref().unwrap() }}
+{% if func.docstring.is_some() %}
+    /// {{ func.docstring.as_ref().unwrap() }}
 {% endif %}
-    public func {{ func.name|camel_case }}(
+    public func {{ func.name }}(
 {% for param in func.params %}
-        {{ param.name|camel_case }}: {{ param.param_type|swift_type }}{% if param.default_value.is_some() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
 
 {% endfor %}
-    ) async throws -> {{ func.return_type|swift_type }} {
+    ) async throws -> {{ func.return_type_string() }} {
         let args: [String: BamlValue] = [
 {% for param in func.params %}
-            "{{ param.name }}": {{ param|to_baml_value }}{% if !loop.last %},{% endif %}
+            "{{ param.baml_name }}": try BamlValue.from({{ param.name }}){% if !loop.last %},{% endif %}
 
 {% endfor %}
         ]
 
-        // Build prompt from template
-        let prompt = """
-        {{ func.prompt_template }}
-        """
-
         return try await runtime.callFunction(
-            "{{ func.name }}",
+            "{{ func.baml_name }}",
             args: args,
-            prompt: prompt,
-            outputType: {{ func.return_type|swift_type }}.self,
-            ctx: RuntimeContext()
+            returnType: {{ func.return_type_string() }}.self
         )
     }
+{% if func.stream_return_type.is_some() %}
+
+{% if func.docstring.is_some() %}
+    /// {{ func.docstring.as_ref().unwrap() }} (streaming)
+{% endif %}
+    public func {{ func.name }}Stream(
+{% for param in func.params %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
+
+{% endfor %}
+    ) -> AsyncThrowingStream<{{ func.stream_return_type_string().unwrap() }}, Error> {
+        let args: [String: BamlValue] = [
+{% for param in func.params %}
+            "{{ param.baml_name }}": try BamlValue.from({{ param.name }}){% if !loop.last %},{% endif %}
+
+{% endfor %}
+        ]
+
+        return runtime.streamFunction(
+            "{{ func.baml_name }}",
+            args: args,
+            partialType: {{ func.stream_return_type_string().unwrap() }}.self
+        )
+    }
+{% endif %}
 {% endfor %}
 }
 
@@ -54,20 +72,23 @@ public final class BamlSyncClient: @unchecked Sendable {
     }
 {% for func in functions %}
 
-    public func {{ func.name|camel_case }}(
+{% if func.docstring.is_some() %}
+    /// {{ func.docstring.as_ref().unwrap() }}
+{% endif %}
+    public func {{ func.name }}(
 {% for param in func.params %}
-        {{ param.name|camel_case }}: {{ param.param_type|swift_type }}{% if param.default_value.is_some() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
 
 {% endfor %}
-    ) throws -> {{ func.return_type|swift_type }} {
+    ) throws -> {{ func.return_type_string() }} {
         let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<{{ func.return_type|swift_type }}, Error>!
+        var result: Result<{{ func.return_type_string() }}, Error>!
 
         Task {
             do {
-                let value = try await asyncClient.{{ func.name|camel_case }}(
+                let value = try await asyncClient.{{ func.name }}(
 {% for param in func.params %}
-                    {{ param.name|camel_case }}: {{ param.name|camel_case }}{% if !loop.last %},{% endif %}
+                    {{ param.name }}: {{ param.name }}{% if !loop.last %},{% endif %}
 
 {% endfor %}
                 )
@@ -82,4 +103,17 @@ public final class BamlSyncClient: @unchecked Sendable {
         return try result.get()
     }
 {% endfor %}
+}
+
+/// Protocol for types that can be converted to BamlValue
+public protocol BamlValueConvertible {
+    func toBamlValue() throws -> BamlValue
+}
+
+extension BamlValue {
+    /// Create a BamlValue from any supported type
+    public static func from<T: Encodable>(_ value: T) throws -> BamlValue {
+        let data = try JSONEncoder().encode(value)
+        return try JSONDecoder().decode(BamlValue.self, from: data)
+    }
 }
