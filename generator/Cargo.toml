@@ -31,6 +31,7 @@ indexmap = { version = "2.0", features = ["serde"] }
 # String utilities
 heck = "0.5"
 either = "1.9"
+regex = "1.10"
 
 # Logging
 log = "0.4"

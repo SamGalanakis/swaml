@@ -267,6 +267,18 @@ impl TypeSwift {
         )
     }
 
+    /// Check if this type is complex (needs JSON encoding for string interpolation)
+    pub fn is_complex(&self) -> bool {
+        matches!(
+            self,
+            TypeSwift::Class { .. }
+                | TypeSwift::List(_)
+                | TypeSwift::Map(_, _)
+                | TypeSwift::Union { .. }
+                | TypeSwift::Any { .. }
+        )
+    }
+
     /// Get the inner type if this is a container (Optional, List, etc.)
     pub fn inner(&self) -> Option<&TypeSwift> {
         match self {

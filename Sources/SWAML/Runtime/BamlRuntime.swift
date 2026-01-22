@@ -45,7 +45,7 @@ public actor BamlRuntime {
         // Merge TypeBuilder schemas with output schema
         let finalSchema = mergeSchemaWithTypeBuilder(outputSchema, typeBuilder: typeBuilder)
 
-        // Determine response format
+        // Determine response format - always use JSON when we have a schema or typed output
         let responseFormat: ResponseFormat?
         if let schema = finalSchema {
             responseFormat = .jsonSchema(
@@ -53,8 +53,11 @@ public actor BamlRuntime {
                 schema: schema.toDictionary(),
                 strict: true
             )
-        } else {
+        } else if ctx.responseFormat != nil {
             responseFormat = ctx.responseFormat
+        } else {
+            // Default to JSON object format for typed outputs
+            responseFormat = .jsonObject
         }
 
         // Execute with retry
@@ -107,7 +110,7 @@ public actor BamlRuntime {
         // Merge TypeBuilder schemas with output schema
         let finalSchema = mergeSchemaWithTypeBuilder(outputSchema, typeBuilder: typeBuilder)
 
-        // Determine response format
+        // Determine response format - always use JSON when we have a schema or typed output
         let responseFormat: ResponseFormat?
         if let schema = finalSchema {
             responseFormat = .jsonSchema(
@@ -115,8 +118,11 @@ public actor BamlRuntime {
                 schema: schema.toDictionary(),
                 strict: true
             )
-        } else {
+        } else if ctx.responseFormat != nil {
             responseFormat = ctx.responseFormat
+        } else {
+            // Default to JSON object format for typed outputs
+            responseFormat = .jsonObject
         }
 
         // Execute with retry

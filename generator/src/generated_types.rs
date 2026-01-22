@@ -193,16 +193,56 @@ impl FunctionSwift {
             .join(",\n        ")
     }
 
-    /// Get the prompt as a Swift multiline string literal
+    /// Get the prompt as a Swift multiline string literal with Jinja converted to Swift interpolation
     pub fn prompt_literal(&self) -> Option<String> {
         self.prompt.as_ref().map(|p| {
-            // Escape for Swift multiline string
-            let escaped = p
+            // Convert Jinja template syntax to Swift string interpolation
+            let converted = convert_jinja_to_swift(p, &self.params);
+            // Escape for Swift multiline string (after conversion)
+            let escaped = converted
                 .replace("\\", "\\\\")
                 .replace("\"\"\"", "\\\"\\\"\\\"");
             format!("\"\"\"\n{}\n\"\"\"", escaped)
         })
     }
+}
+
+/// Convert Jinja template syntax to Swift string interpolation
+fn convert_jinja_to_swift(template: &str, params: &[ParamSwift]) -> String {
+    use regex::Regex;
+
+    let mut result = template.to_string();
+
+    // Remove {{ _.role("...") }} calls - these are BAML role markers
+    let role_regex = Regex::new(r#"\{\{\s*_\.role\([^)]+\)\s*\}\}"#).unwrap();
+    result = role_regex.replace_all(&result, "").to_string();
+
+    // Convert {{ ctx.output_format }} to a placeholder comment
+    let ctx_output_regex = Regex::new(r#"\{\{\s*ctx\.output_format\s*\}\}"#).unwrap();
+    result = ctx_output_regex.replace_all(&result, "Respond with valid JSON matching the schema.").to_string();
+
+    // Convert {{ variable_name }} to \(variableName)
+    // Match Jinja variables like {{ user_name }}, {{ formatted_messages }}, etc.
+    let var_regex = Regex::new(r#"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}"#).unwrap();
+    result = var_regex.replace_all(&result, |caps: &regex::Captures| {
+        let var_name = &caps[1];
+        // Convert snake_case to camelCase
+        let swift_var = crate::swift_types::snake_to_camel(var_name);
+        // Check if this is a param that needs JSON encoding (complex types)
+        let param = params.iter().find(|p| p.baml_name == var_name);
+        if let Some(p) = param {
+            // For complex types (not String/Int/etc), encode to JSON
+            if p.param_type.is_complex() {
+                format!("\\(try! String(data: JSONEncoder().encode({}), encoding: .utf8)!)", swift_var)
+            } else {
+                format!("\\({})", swift_var)
+            }
+        } else {
+            format!("\\({})", swift_var)
+        }
+    }).to_string();
+
+    result
 }
 
 /// Represents a function parameter in Swift
