@@ -229,50 +229,38 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(result.relationshipHealth.score, 0.9)
     }
 
-    // MARK: - TypeBuilder for Dynamic Schema
+    // MARK: - TypeBuilder for Dynamic Enums
 
-    func testTypeBuilderForChatAnalysis() throws {
+    func testTypeBuilderForDynamicEnums() throws {
         let tb = TypeBuilder()
 
-        // Build enum
-        tb.addEnum("MomentCategory")
-            .addValue("Highlight")
-            .addValue("Lowlight")
-            .addValue("Achievement")
+        // Add values to dynamic enums (like MomentId, PatternId in BAML)
+        tb.enumBuilder("MomentId")
+            .addValue("moment_emma_1")
+            .addValue("moment_emma_2")
+            .addValue("moment_jake_1")
 
-        // Build nested class
-        tb.addClass("Moment")
-            .addProperty("message_index", type: .int)
-            .addProperty("title", type: .string)
-            .addProperty("text", type: .string)
-            .addProperty("quote", type: .string)
-            .addProperty("emoji", type: .string)
-            .addProperty("category", type: .reference("MomentCategory"))
+        tb.enumBuilder("PatternId")
+            .addValue("pattern_1")
+            .addValue("pattern_2")
 
-        tb.addClass("RelationshipHealthScore")
-            .addProperty("score", type: .float)
-            .addProperty("note", type: .string)
+        // Verify enum values are stored
+        let momentValues = tb.dynamicEnumValues()["MomentId"]
+        XCTAssertEqual(momentValues, ["moment_emma_1", "moment_emma_2", "moment_jake_1"])
 
-        // Build main result class
-        tb.addClass("ChatAnalysisResult")
-            .addProperty("contact_titles", type: .array(.string))
-            .addProperty("relationship_health", type: .reference("RelationshipHealthScore"))
-            .addProperty("moments", type: .array(.reference("Moment")))
-            .addProperty("roasts", type: .array(.string))
-            .addProperty("is_family", type: .bool)
+        let patternValues = tb.dynamicEnumValues()["PatternId"]
+        XCTAssertEqual(patternValues, ["pattern_1", "pattern_2"])
 
-        // Build schema
-        let schema = try tb.buildSchema(root: "ChatAnalysisResult")
+        // Verify schema generation for dynamic enum
+        let schema = tb.buildEnumSchema("MomentId")
+        XCTAssertNotNil(schema)
 
-        XCTAssertNotNil(schema["type"])
-        XCTAssertNotNil(schema["properties"])
-        XCTAssertNotNil(schema["$defs"])
-
-        // Verify definitions exist
-        let defs = schema["$defs"] as? [String: Any]
-        XCTAssertNotNil(defs?["Moment"])
-        XCTAssertNotNil(defs?["MomentCategory"])
-        XCTAssertNotNil(defs?["RelationshipHealthScore"])
+        if case .enum(let values) = schema {
+            XCTAssertEqual(values.count, 3)
+            XCTAssertTrue(values.contains("moment_emma_1"))
+        } else {
+            XCTFail("Expected enum schema")
+        }
     }
 
     // MARK: - BamlValue Dynamic Access

@@ -3,7 +3,133 @@ import XCTest
 
 final class TypeBuilderTests: XCTestCase {
 
-    // MARK: - Class Builder
+    // MARK: - Dynamic Enum Builder
+
+    func testDynamicEnumBuilder() {
+        let builder = DynamicEnumBuilder(name: "MomentId")
+        builder.addValue("moment_1")
+        builder.addValue("moment_2")
+        builder.addValue("moment_3")
+
+        XCTAssertEqual(builder.name, "MomentId")
+        XCTAssertEqual(builder.allValues, ["moment_1", "moment_2", "moment_3"])
+        XCTAssertEqual(builder.count, 3)
+        XCTAssertTrue(builder.hasValue("moment_1"))
+        XCTAssertFalse(builder.hasValue("moment_999"))
+    }
+
+    func testDynamicEnumBuilderNoDuplicates() {
+        let builder = DynamicEnumBuilder(name: "PatternId")
+        builder.addValue("pattern_1")
+        builder.addValue("pattern_1") // duplicate
+        builder.addValue("pattern_2")
+
+        XCTAssertEqual(builder.count, 2)
+        XCTAssertEqual(builder.allValues, ["pattern_1", "pattern_2"])
+    }
+
+    func testDynamicEnumBuilderChaining() {
+        let builder = DynamicEnumBuilder(name: "TestEnum")
+            .addValue("a")
+            .addValue("b")
+            .addValue("c")
+
+        XCTAssertEqual(builder.count, 3)
+    }
+
+    // MARK: - Static Enum Viewer
+
+    func testStaticEnumViewer() {
+        let viewer = StaticEnumViewer(
+            name: "Status",
+            values: [
+                EnumValue(name: "ACTIVE", alias: "Active"),
+                EnumValue(name: "INACTIVE", alias: "Inactive"),
+                EnumValue(name: "PENDING")
+            ]
+        )
+
+        XCTAssertEqual(viewer.name, "Status")
+        XCTAssertEqual(viewer.values.count, 3)
+        XCTAssertTrue(viewer.hasValue("ACTIVE"))
+        XCTAssertFalse(viewer.hasValue("Unknown"))
+        XCTAssertEqual(viewer.value("ACTIVE")?.stringValue, "Active")
+        XCTAssertEqual(viewer.value("PENDING")?.stringValue, "PENDING")
+    }
+
+    // MARK: - TypeBuilder
+
+    func testTypeBuilder() {
+        let tb = TypeBuilder()
+
+        // Get enum builder (creates if not exists)
+        let momentBuilder = tb.enumBuilder("MomentId")
+        momentBuilder.addValue("moment_1")
+        momentBuilder.addValue("moment_2")
+
+        // Get same enum builder again
+        let sameBuilder = tb.enumBuilder("MomentId")
+        sameBuilder.addValue("moment_3")
+
+        // Should be the same instance
+        XCTAssertEqual(momentBuilder.count, 3)
+        XCTAssertEqual(sameBuilder.count, 3)
+    }
+
+    func testTypeBuilderDynamicEnumValues() {
+        let tb = TypeBuilder()
+
+        tb.enumBuilder("MomentId").addValue("m1").addValue("m2")
+        tb.enumBuilder("PatternId").addValue("p1")
+
+        let values = tb.dynamicEnumValues()
+        XCTAssertEqual(values["MomentId"], ["m1", "m2"])
+        XCTAssertEqual(values["PatternId"], ["p1"])
+    }
+
+    func testTypeBuilderBuildEnumSchema() {
+        let tb = TypeBuilder()
+
+        tb.enumBuilder("TestEnum").addValue("A").addValue("B").addValue("C")
+
+        let schema = tb.buildEnumSchema("TestEnum")
+        XCTAssertNotNil(schema)
+
+        if case .enum(let values) = schema {
+            XCTAssertEqual(values, ["A", "B", "C"])
+        } else {
+            XCTFail("Expected enum schema")
+        }
+    }
+
+    func testTypeBuilderEmptyEnumSchema() {
+        let tb = TypeBuilder()
+
+        // Enum exists but has no values
+        _ = tb.enumBuilder("EmptyEnum")
+
+        let schema = tb.buildEnumSchema("EmptyEnum")
+        XCTAssertNil(schema) // Should be nil when no values
+    }
+
+    func testTypeBuilderNonExistentEnumSchema() {
+        let tb = TypeBuilder()
+
+        let schema = tb.buildEnumSchema("DoesNotExist")
+        XCTAssertNil(schema)
+    }
+
+    // MARK: - EnumValue
+
+    func testEnumValue() {
+        let withAlias = EnumValue(name: "HAPPY", alias: "Happy")
+        let withoutAlias = EnumValue(name: "SAD")
+
+        XCTAssertEqual(withAlias.stringValue, "Happy")
+        XCTAssertEqual(withoutAlias.stringValue, "SAD")
+    }
+
+    // MARK: - Legacy Class Builder
 
     func testClassBuilder() {
         let builder = ClassBuilder(name: "Person")
@@ -31,22 +157,7 @@ final class TypeBuilderTests: XCTestCase {
         }
     }
 
-    func testClassBuilderOptionalNotRequired() {
-        let builder = ClassBuilder(name: "User")
-            .addProperty("id", type: .int)
-            .addProperty("nickname", type: .optional(.string))
-
-        let schema = builder.buildSchema()
-
-        if case .object(_, let required, _) = schema {
-            XCTAssertTrue(required.contains("id"))
-            XCTAssertFalse(required.contains("nickname"))
-        } else {
-            XCTFail("Expected object schema")
-        }
-    }
-
-    // MARK: - Enum Builder
+    // MARK: - Legacy Enum Builder
 
     func testEnumBuilder() {
         let builder = EnumBuilder(name: "Status")
@@ -83,98 +194,40 @@ final class TypeBuilderTests: XCTestCase {
         }
     }
 
-    // MARK: - Type Builder
+    // MARK: - Thread Safety
 
-    func testTypeBuilder() {
+    func testDynamicEnumBuilderThreadSafety() async {
+        let builder = DynamicEnumBuilder(name: "ThreadTest")
+
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<100 {
+                group.addTask {
+                    builder.addValue("value_\(i)")
+                }
+            }
+        }
+
+        // Should have all unique values
+        XCTAssertEqual(builder.count, 100)
+    }
+
+    func testTypeBuilderThreadSafety() async {
         let tb = TypeBuilder()
 
-        tb.addClass("Person")
-            .addProperty("name", type: .string)
-            .addProperty("age", type: .int)
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<50 {
+                group.addTask {
+                    tb.enumBuilder("Enum\(i % 5)").addValue("value_\(i)")
+                }
+            }
+        }
 
-        tb.addEnum("Status")
-            .addValue("active")
-            .addValue("inactive")
+        // Should have 5 enum builders
+        XCTAssertEqual(tb.allEnumBuilders.count, 5)
 
-        XCTAssertEqual(tb.classNames.count, 1)
-        XCTAssertEqual(tb.enumNames.count, 1)
-        XCTAssertNotNil(tb.getClass("Person"))
-        XCTAssertNotNil(tb.getEnum("Status"))
-    }
-
-    func testTypeBuilderBuildSchema() throws {
-        let tb = TypeBuilder()
-
-        tb.addClass("Response")
-            .addProperty("score", type: .float)
-            .addProperty("labels", type: .array(.string))
-
-        let schema = try tb.buildSchema(root: "Response")
-
-        XCTAssertNotNil(schema["type"])
-        XCTAssertNotNil(schema["properties"])
-    }
-
-    func testTypeBuilderSimpleHelpers() {
-        let tb = TypeBuilder()
-
-        tb.addSimpleClass("Point", properties: [
-            "x": .float,
-            "y": .float
-        ])
-
-        tb.addSimpleEnum("Direction", values: ["north", "south", "east", "west"])
-
-        XCTAssertNotNil(tb.getClass("Point"))
-        XCTAssertNotNil(tb.getEnum("Direction"))
-        XCTAssertEqual(tb.getEnum("Direction")?.valueStrings.count, 4)
-    }
-
-    // MARK: - Schema Generation
-
-    func testSchemaWithReferences() throws {
-        let tb = TypeBuilder()
-
-        tb.addClass("Address")
-            .addProperty("street", type: .string)
-            .addProperty("city", type: .string)
-
-        tb.addClass("Person")
-            .addProperty("name", type: .string)
-            .addProperty("address", type: .reference("Address"))
-
-        let schema = try tb.buildSchema(root: "Person")
-
-        XCTAssertNotNil(schema["$defs"])
-    }
-
-    // MARK: - Swift Code Generation
-
-    func testGenerateSwiftStruct() {
-        let builder = ClassBuilder(name: "User")
-            .addProperty("id", type: .int, description: "Unique identifier")
-            .addProperty("name", type: .string)
-            .addProperty("scores", type: .array(.float))
-
-        let code = builder.generateSwiftStruct()
-
-        XCTAssertTrue(code.contains("public struct User"))
-        XCTAssertTrue(code.contains("public let id: Int"))
-        XCTAssertTrue(code.contains("public let name: String"))
-        XCTAssertTrue(code.contains("public let scores: [Double]"))
-    }
-
-    func testGenerateSwiftEnum() {
-        let builder = EnumBuilder(name: "Priority")
-            .addValue("LOW")
-            .addValue("MEDIUM")
-            .addValue("HIGH")
-
-        let code = builder.generateSwiftEnum()
-
-        XCTAssertTrue(code.contains("public enum Priority"))
-        XCTAssertTrue(code.contains("case low"))
-        XCTAssertTrue(code.contains("case medium"))
-        XCTAssertTrue(code.contains("case high"))
+        // Each should have 10 values
+        for i in 0..<5 {
+            XCTAssertEqual(tb.enumBuilder("Enum\(i)").count, 10)
+        }
     }
 }

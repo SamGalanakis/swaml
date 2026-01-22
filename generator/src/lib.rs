@@ -142,6 +142,13 @@ impl SwiftGenerator {
             globals_content,
         );
 
+        // Generate TypeBuilder.swift
+        let type_builder_content = self.generate_type_builder(&enums, &classes)?;
+        collector.add_file(
+            format!("{}/TypeBuilder.swift", self.config.output_dir),
+            type_builder_content,
+        );
+
         // Generate streaming types if enabled
         if self.config.generate_streaming {
             let stream_classes = self.convert_stream_classes(&ir.classes, &ctx);
@@ -293,6 +300,12 @@ impl SwiftGenerator {
         let template = StreamTypesTemplate { classes };
         Ok(template.render()?)
     }
+
+    /// Generate TypeBuilder.swift content
+    fn generate_type_builder(&self, enums: &[EnumSwift], classes: &[ClassSwift]) -> Result<String> {
+        let template = TypeBuilderTemplate { enums, classes };
+        Ok(template.render()?)
+    }
 }
 
 // Askama templates
@@ -334,6 +347,13 @@ struct GlobalsTemplate<'a> {
 #[derive(Template)]
 #[template(path = "stream_types.swift.j2", escape = "none")]
 struct StreamTypesTemplate<'a> {
+    classes: &'a [ClassSwift],
+}
+
+#[derive(Template)]
+#[template(path = "type_builder.swift.j2", escape = "none")]
+struct TypeBuilderTemplate<'a> {
+    enums: &'a [EnumSwift],
     classes: &'a [ClassSwift],
 }
 

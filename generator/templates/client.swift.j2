@@ -4,6 +4,33 @@
 import Foundation
 import SWAML
 
+/// Options for BAML function calls
+public struct BamlCallOptions: Sendable {
+    /// TypeBuilder for dynamic enum values
+    public let typeBuilder: TypeBuilder?
+
+    /// Client name override
+    public let clientName: String?
+
+    public init(
+        typeBuilder: TypeBuilder? = nil,
+        clientName: String? = nil
+    ) {
+        self.typeBuilder = typeBuilder
+        self.clientName = clientName
+    }
+
+    /// Create options with just a TypeBuilder
+    public static func with(typeBuilder: TypeBuilder) -> BamlCallOptions {
+        BamlCallOptions(typeBuilder: typeBuilder)
+    }
+
+    /// Create options with just a client name
+    public static func with(clientName: String) -> BamlCallOptions {
+        BamlCallOptions(clientName: clientName)
+    }
+}
+
 /// Async BAML client with all generated functions
 public actor BamlAsyncClient {
     private let runtime: BamlRuntime
@@ -18,9 +45,9 @@ public actor BamlAsyncClient {
 {% endif %}
     public func {{ func.name }}(
 {% for param in func.params %}
-        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
-
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
 {% endfor %}
+        options: BamlCallOptions? = nil
     ) async throws -> {{ func.return_type_string() }} {
         let args: [String: BamlValue] = [
 {% for param in func.params %}
@@ -33,16 +60,22 @@ public actor BamlAsyncClient {
         let prompt = {{ func.prompt_literal().unwrap() }}
 {% endif %}
 
+        var ctx = RuntimeContext.default
+        if let clientName = options?.clientName {
+            ctx = RuntimeContext(clientName: clientName)
+        }
+
         return try await runtime.callFunction(
             "{{ func.baml_name }}",
             args: args,
 {% if func.prompt.is_some() %}
             prompt: prompt,
 {% endif %}
-            outputType: {{ func.return_type_string() }}.self
+            outputType: {{ func.return_type_string() }}.self,
+            typeBuilder: options?.typeBuilder,
+            ctx: ctx
         )
     }
-{# Streaming not yet supported in SWAML runtime #}
 {% endfor %}
 }
 
@@ -60,9 +93,9 @@ public final class BamlSyncClient: @unchecked Sendable {
 {% endif %}
     public func {{ func.name }}(
 {% for param in func.params %}
-        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
-
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
 {% endfor %}
+        options: BamlCallOptions? = nil
     ) throws -> {{ func.return_type_string() }} {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<{{ func.return_type_string() }}, Error>!
@@ -71,9 +104,9 @@ public final class BamlSyncClient: @unchecked Sendable {
             do {
                 let value = try await asyncClient.{{ func.name }}(
 {% for param in func.params %}
-                    {{ param.name }}: {{ param.name }}{% if !loop.last %},{% endif %}
-
+                    {{ param.name }}: {{ param.name }},
 {% endfor %}
+                    options: options
                 )
                 result = .success(value)
             } catch {

@@ -19,6 +19,7 @@ public actor BamlRuntime {
         args: [String: BamlValue],
         prompt: String,
         outputSchema: JSONSchema? = nil,
+        typeBuilder: TypeBuilder? = nil,
         ctx: RuntimeContext = .default
     ) async throws -> BamlValue {
         // Get the client configuration
@@ -41,9 +42,12 @@ public actor BamlRuntime {
         // Build messages
         let messages = [ChatMessage.user(prompt)]
 
+        // Merge TypeBuilder schemas with output schema
+        let finalSchema = mergeSchemaWithTypeBuilder(outputSchema, typeBuilder: typeBuilder)
+
         // Determine response format
         let responseFormat: ResponseFormat?
-        if let schema = outputSchema {
+        if let schema = finalSchema {
             responseFormat = .jsonSchema(
                 name: name,
                 schema: schema.toDictionary(),
@@ -67,7 +71,7 @@ public actor BamlRuntime {
         }
 
         // Parse the response
-        return try OutputParser.parseToValue(response.content, schema: outputSchema)
+        return try OutputParser.parseToValue(response.content, schema: finalSchema)
     }
 
     /// Call a function with typed output
@@ -77,6 +81,7 @@ public actor BamlRuntime {
         prompt: String,
         outputSchema: JSONSchema? = nil,
         outputType: T.Type,
+        typeBuilder: TypeBuilder? = nil,
         ctx: RuntimeContext = .default
     ) async throws -> T {
         // Get the client configuration
@@ -99,9 +104,12 @@ public actor BamlRuntime {
         // Build messages
         let messages = [ChatMessage.user(prompt)]
 
+        // Merge TypeBuilder schemas with output schema
+        let finalSchema = mergeSchemaWithTypeBuilder(outputSchema, typeBuilder: typeBuilder)
+
         // Determine response format
         let responseFormat: ResponseFormat?
-        if let schema = outputSchema {
+        if let schema = finalSchema {
             responseFormat = .jsonSchema(
                 name: name,
                 schema: schema.toDictionary(),
@@ -125,7 +133,7 @@ public actor BamlRuntime {
         }
 
         // Parse the response
-        return try OutputParser.parse(response.content, schema: outputSchema, type: T.self)
+        return try OutputParser.parse(response.content, schema: finalSchema, type: T.self)
     }
 
     /// Execute a raw completion (no function abstraction)
@@ -164,6 +172,53 @@ public actor BamlRuntime {
                 temperature: temperature ?? clientConfig.defaultTemperature,
                 maxTokens: maxTokens ?? clientConfig.defaultMaxTokens
             )
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    /// Merge TypeBuilder's dynamic enum values into the output schema
+    private func mergeSchemaWithTypeBuilder(_ schema: JSONSchema?, typeBuilder: TypeBuilder?) -> JSONSchema? {
+        guard let schema = schema, let tb = typeBuilder else {
+            return schema
+        }
+
+        let dynamicEnums = tb.dynamicEnumValues()
+        if dynamicEnums.isEmpty {
+            return schema
+        }
+
+        // Recursively update the schema to replace dynamic enum references
+        return updateSchemaWithDynamicEnums(schema, dynamicEnums: dynamicEnums)
+    }
+
+    /// Recursively update schema to include dynamic enum values
+    private func updateSchemaWithDynamicEnums(_ schema: JSONSchema, dynamicEnums: [String: [String]]) -> JSONSchema {
+        switch schema {
+        case .ref(let name):
+            // If this is a reference to a dynamic enum, replace with enum schema
+            if let values = dynamicEnums[name] {
+                return .enum(values: values)
+            }
+            return schema
+
+        case .object(let properties, let required, let additionalProps):
+            // Recursively update properties
+            var updatedProps: [String: JSONSchema] = [:]
+            for (key, propSchema) in properties {
+                updatedProps[key] = updateSchemaWithDynamicEnums(propSchema, dynamicEnums: dynamicEnums)
+            }
+            let updatedAdditional = additionalProps.map { updateSchemaWithDynamicEnums($0, dynamicEnums: dynamicEnums) }
+            return .object(properties: updatedProps, required: required, additionalProperties: updatedAdditional)
+
+        case .array(let items):
+            return .array(items: updateSchemaWithDynamicEnums(items, dynamicEnums: dynamicEnums))
+
+        case .anyOf(let schemas):
+            return .anyOf(schemas.map { updateSchemaWithDynamicEnums($0, dynamicEnums: dynamicEnums) })
+
+        default:
+            return schema
         }
     }
 }
