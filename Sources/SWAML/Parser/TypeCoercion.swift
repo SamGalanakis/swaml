@@ -4,25 +4,38 @@ import Foundation
 public struct TypeCoercion {
 
     /// Coerce a BamlValue to match expected type in schema
-    public static func coerce(_ value: BamlValue, to type: PropertyType) throws -> BamlValue {
+    public static func coerce(_ value: BamlValue, to type: FieldType) throws -> BamlValue {
         switch type {
-        case .string:
+        case .string, .literalString:
             return try coerceToString(value)
-        case .int:
+        case .int, .literalInt:
             return try coerceToInt(value)
         case .float:
             return try coerceToFloat(value)
-        case .bool:
+        case .bool, .literalBool:
             return try coerceToBool(value)
+        case .null:
+            if value.isNull {
+                return .null
+            }
+            throw BamlError.typeCoercionError(expected: "null", actual: value.typeName)
         case .optional(let inner):
             if value.isNull {
                 return .null
             }
             return try coerce(value, to: inner)
-        case .array(let element):
+        case .list(let element):
             return try coerceToArray(value, elementType: element)
         case .map(let keyType, let valueType):
             return try coerceToMap(value, keyType: keyType, valueType: valueType)
+        case .union(let types):
+            // Try each type in the union until one succeeds
+            for unionType in types {
+                if let result = try? coerce(value, to: unionType) {
+                    return result
+                }
+            }
+            throw BamlError.typeCoercionError(expected: "union type", actual: value.typeName)
         case .reference:
             // References are validated at a higher level
             return value
@@ -118,7 +131,7 @@ public struct TypeCoercion {
 
     // MARK: - Array Coercion
 
-    private static func coerceToArray(_ value: BamlValue, elementType: PropertyType) throws -> BamlValue {
+    private static func coerceToArray(_ value: BamlValue, elementType: FieldType) throws -> BamlValue {
         guard case .array(let elements) = value else {
             throw BamlError.typeCoercionError(expected: "array", actual: value.typeName)
         }
@@ -129,7 +142,7 @@ public struct TypeCoercion {
 
     // MARK: - Map Coercion
 
-    private static func coerceToMap(_ value: BamlValue, keyType: PropertyType, valueType: PropertyType) throws -> BamlValue {
+    private static func coerceToMap(_ value: BamlValue, keyType: FieldType, valueType: FieldType) throws -> BamlValue {
         guard case .map(let dict) = value else {
             throw BamlError.typeCoercionError(expected: "map", actual: value.typeName)
         }

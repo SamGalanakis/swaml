@@ -17,11 +17,72 @@ open class TypeBuilder: @unchecked Sendable {
     /// Dynamic enum builders (for @@dynamic enums)
     private var enumBuilders: [String: DynamicEnumBuilder] = [:]
 
+    /// Dynamic class builders
+    private var classBuilders: [String: DynamicClassBuilder] = [:]
+
     /// Initialize with known types from the BAML schema
     public init(classes: Set<String> = [], enums: Set<String> = []) {
         self.knownClasses = classes
         self.knownEnums = enums
     }
+
+    // MARK: - Primitive Type Factories
+
+    /// Create a string type
+    public func string() -> FieldType { .string }
+
+    /// Create an integer type
+    public func int() -> FieldType { .int }
+
+    /// Create a float/double type
+    public func float() -> FieldType { .float }
+
+    /// Create a boolean type
+    public func bool() -> FieldType { .bool }
+
+    /// Create a null type
+    public func null() -> FieldType { .null }
+
+    // MARK: - Literal Type Factories
+
+    /// Create a literal string type
+    public func literalString(_ value: String) -> FieldType {
+        .literalString(value)
+    }
+
+    /// Create a literal integer type
+    public func literalInt(_ value: Int) -> FieldType {
+        .literalInt(value)
+    }
+
+    /// Create a literal boolean type
+    public func literalBool(_ value: Bool) -> FieldType {
+        .literalBool(value)
+    }
+
+    // MARK: - Composite Type Factories
+
+    /// Create a list type
+    public func list(_ inner: FieldType) -> FieldType {
+        .list(inner)
+    }
+
+    /// Create a map type
+    public func map(key: FieldType, value: FieldType) -> FieldType {
+        .map(key: key, value: value)
+    }
+
+    /// Create a union type
+    public func union(_ types: FieldType...) -> FieldType {
+        .union(types)
+    }
+
+    /// Create a union type from array
+    public func union(_ types: [FieldType]) -> FieldType {
+        .union(types)
+    }
+
+    // MARK: - Dynamic Type Creation
 
     /// Get or create a dynamic enum builder
     public func enumBuilder(_ name: String) -> DynamicEnumBuilder {
@@ -37,11 +98,42 @@ open class TypeBuilder: @unchecked Sendable {
         return builder
     }
 
+    /// Create or get a dynamic enum builder (alias for enumBuilder)
+    public func addEnum(_ name: String) -> DynamicEnumBuilder {
+        enumBuilder(name)
+    }
+
+    /// Create or get a dynamic class builder
+    public func addClass(_ name: String) -> DynamicClassBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let existing = classBuilders[name] {
+            return existing
+        }
+
+        let builder = DynamicClassBuilder(name: name)
+        classBuilders[name] = builder
+        return builder
+    }
+
+    /// Get or create a dynamic class builder (alias for addClass)
+    public func classBuilder(_ name: String) -> DynamicClassBuilder {
+        addClass(name)
+    }
+
     /// Get all enum builders
     public var allEnumBuilders: [String: DynamicEnumBuilder] {
         lock.lock()
         defer { lock.unlock() }
         return enumBuilders
+    }
+
+    /// Get all class builders
+    public var allClassBuilders: [String: DynamicClassBuilder] {
+        lock.lock()
+        defer { lock.unlock() }
+        return classBuilders
     }
 
     /// Build JSON Schema for a dynamic enum (with added values)
@@ -61,6 +153,18 @@ open class TypeBuilder: @unchecked Sendable {
         return .enum(values: values)
     }
 
+    /// Build JSON Schema for a dynamic class
+    public func buildClassSchema(_ name: String) -> JSONSchema? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let builder = classBuilders[name] else {
+            return nil
+        }
+
+        return builder.buildSchema()
+    }
+
     /// Get all dynamic enum values as a dictionary
     public func dynamicEnumValues() -> [String: [String]] {
         lock.lock()
@@ -75,6 +179,118 @@ open class TypeBuilder: @unchecked Sendable {
         }
         return result
     }
+
+    // MARK: - FFI Serialization
+
+    /// Serialize the TypeBuilder state for FFI
+    public func toSerializable() -> [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let enums = enumBuilders.values
+            .filter { !$0.allValues.isEmpty }
+            .map { $0.toSerializable() }
+
+        let classes = classBuilders.values
+            .filter { !$0.allPropertyNames.isEmpty }
+            .map { $0.toSerializable() }
+
+        return [
+            "enums": enums,
+            "classes": classes
+        ]
+    }
+
+    /// Serialize the TypeBuilder state to JSON data
+    public func toJSON() throws -> Data {
+        try JSONSerialization.data(withJSONObject: toSerializable())
+    }
+
+    /// Serialize the TypeBuilder state to a JSON string
+    public func toJSONString(prettyPrinted: Bool = false) throws -> String {
+        let options: JSONSerialization.WritingOptions = prettyPrinted ? [.prettyPrinted, .sortedKeys] : []
+        let data = try JSONSerialization.data(withJSONObject: toSerializable(), options: options)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw TypeBuilderError.serializationFailed
+        }
+        return string
+    }
+}
+
+/// Errors that can occur during TypeBuilder operations
+public enum TypeBuilderError: Error, LocalizedError {
+    case serializationFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .serializationFailed:
+            return "Failed to serialize TypeBuilder to JSON"
+        }
+    }
+}
+
+// MARK: - Enum Value Builder
+
+/// Builder for enum values with metadata (description, alias)
+public final class EnumValueBuilder: @unchecked Sendable {
+    private let lock = NSLock()
+
+    /// Name of the enum value
+    public let name: String
+
+    private var _description: String?
+    private var _alias: String?
+
+    public init(name: String) {
+        self.name = name
+    }
+
+    /// Set the description for this enum value
+    @discardableResult
+    public func description(_ desc: String) -> EnumValueBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+        _description = desc
+        return self
+    }
+
+    /// Set the alias for this enum value
+    @discardableResult
+    public func alias(_ alias: String) -> EnumValueBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+        _alias = alias
+        return self
+    }
+
+    /// Get the description
+    public var descriptionValue: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _description
+    }
+
+    /// Get the alias
+    public var aliasValue: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _alias
+    }
+
+    /// Convert to serializable dictionary
+    public func toSerializable() -> [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        var dict: [String: Any] = ["name": name]
+        if let desc = _description {
+            dict["description"] = desc
+        }
+        if let alias = _alias {
+            dict["alias"] = alias
+        }
+        return dict
+    }
 }
 
 // MARK: - Dynamic Enum Builder
@@ -86,46 +302,252 @@ public class DynamicEnumBuilder: @unchecked Sendable {
     /// Name of the enum
     public let name: String
 
-    /// Values added to this enum
-    private var values: [String] = []
-    private var valueSet: Set<String> = []
+    /// Values added to this enum (preserves order)
+    private var valueOrder: [String] = []
+    private var valueBuilders: [String: EnumValueBuilder] = [:]
 
     public init(name: String) {
         self.name = name
     }
 
-    /// Add a value to this dynamic enum
+    /// Add a value to this dynamic enum, returning a builder for metadata
     @discardableResult
-    public func addValue(_ value: String) -> DynamicEnumBuilder {
+    public func addValue(_ value: String) -> EnumValueBuilder {
         lock.lock()
         defer { lock.unlock() }
 
-        if !valueSet.contains(value) {
-            values.append(value)
-            valueSet.insert(value)
+        if let existing = valueBuilders[value] {
+            return existing
         }
-        return self
+
+        let builder = EnumValueBuilder(name: value)
+        valueOrder.append(value)
+        valueBuilders[value] = builder
+        return builder
     }
 
     /// Get all values in order
     public var allValues: [String] {
         lock.lock()
         defer { lock.unlock() }
-        return values
+        return valueOrder
+    }
+
+    /// Get all value builders
+    public var allValueBuilders: [EnumValueBuilder] {
+        lock.lock()
+        defer { lock.unlock() }
+        return valueOrder.compactMap { valueBuilders[$0] }
     }
 
     /// Check if a value exists
     public func hasValue(_ value: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return valueSet.contains(value)
+        return valueBuilders[value] != nil
     }
 
     /// Get the count of values
     public var count: Int {
         lock.lock()
         defer { lock.unlock() }
-        return values.count
+        return valueOrder.count
+    }
+
+    /// Get a FieldType reference to this enum
+    public func type() -> FieldType {
+        .reference(name)
+    }
+
+    /// Convert to serializable dictionary
+    public func toSerializable() -> [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return [
+            "name": name,
+            "values": valueOrder.compactMap { valueBuilders[$0]?.toSerializable() }
+        ]
+    }
+}
+
+// MARK: - Class Property Builder
+
+/// Builder for class properties with metadata (description, alias)
+public final class ClassPropertyBuilder: @unchecked Sendable {
+    private let lock = NSLock()
+
+    /// Name of the property
+    public let name: String
+
+    /// Type of the property
+    private var _type: FieldType
+
+    private var _description: String?
+    private var _alias: String?
+
+    public init(name: String, type: FieldType) {
+        self.name = name
+        self._type = type
+    }
+
+    /// Set the description for this property
+    @discardableResult
+    public func description(_ desc: String) -> ClassPropertyBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+        _description = desc
+        return self
+    }
+
+    /// Set the alias for this property
+    @discardableResult
+    public func alias(_ alias: String) -> ClassPropertyBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+        _alias = alias
+        return self
+    }
+
+    /// Get the type
+    public var fieldType: FieldType {
+        lock.lock()
+        defer { lock.unlock() }
+        return _type
+    }
+
+    /// Get the description
+    public var descriptionValue: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _description
+    }
+
+    /// Get the alias
+    public var aliasValue: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _alias
+    }
+
+    /// Convert to serializable dictionary
+    public func toSerializable() -> [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        var dict: [String: Any] = [
+            "name": name,
+            "type": _type.toSerializable()
+        ]
+        if let desc = _description {
+            dict["description"] = desc
+        }
+        if let alias = _alias {
+            dict["alias"] = alias
+        }
+        return dict
+    }
+}
+
+// MARK: - Dynamic Class Builder
+
+/// Builder for dynamic classes with properties
+public final class DynamicClassBuilder: @unchecked Sendable {
+    private let lock = NSLock()
+
+    /// Name of the class
+    public let name: String
+
+    /// Properties in order
+    private var propertyOrder: [String] = []
+    private var propertyBuilders: [String: ClassPropertyBuilder] = [:]
+
+    public init(name: String) {
+        self.name = name
+    }
+
+    /// Add a property to this class
+    @discardableResult
+    public func addProperty(_ propertyName: String, _ type: FieldType) -> ClassPropertyBuilder {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let existing = propertyBuilders[propertyName] {
+            return existing
+        }
+
+        let builder = ClassPropertyBuilder(name: propertyName, type: type)
+        propertyOrder.append(propertyName)
+        propertyBuilders[propertyName] = builder
+        return builder
+    }
+
+    /// Get all property builders in order
+    public var allPropertyBuilders: [ClassPropertyBuilder] {
+        lock.lock()
+        defer { lock.unlock() }
+        return propertyOrder.compactMap { propertyBuilders[$0] }
+    }
+
+    /// Get all property names in order
+    public var allPropertyNames: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return propertyOrder
+    }
+
+    /// Check if a property exists
+    public func hasProperty(_ propertyName: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return propertyBuilders[propertyName] != nil
+    }
+
+    /// Get the count of properties
+    public var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return propertyOrder.count
+    }
+
+    /// Get a FieldType reference to this class
+    public func type() -> FieldType {
+        .reference(name)
+    }
+
+    /// Convert to serializable dictionary
+    public func toSerializable() -> [String: Any] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return [
+            "name": name,
+            "properties": propertyOrder.compactMap { propertyBuilders[$0]?.toSerializable() }
+        ]
+    }
+
+    /// Build JSON Schema for this class
+    public func buildSchema() -> JSONSchema {
+        lock.lock()
+        defer { lock.unlock() }
+
+        var props: [String: JSONSchema] = [:]
+        for name in propertyOrder {
+            if let builder = propertyBuilders[name] {
+                props[name] = builder.fieldType.toJSONSchema()
+            }
+        }
+
+        // All properties are required by default (non-optional)
+        let required = propertyOrder.filter { name in
+            guard let builder = propertyBuilders[name] else { return true }
+            if case .optional = builder.fieldType.kind {
+                return false
+            }
+            return true
+        }
+
+        return .object(properties: props, required: required)
     }
 }
 
@@ -181,108 +603,3 @@ public class StaticEnumViewer: @unchecked Sendable {
     }
 }
 
-// MARK: - Class Builder (for future use)
-
-/// Builder for dynamic class properties
-public class ClassBuilder: @unchecked Sendable {
-    public let name: String
-    private var properties: [String: PropertyType] = [:]
-    private var required: Set<String> = []
-
-    public init(name: String) {
-        self.name = name
-    }
-
-    @discardableResult
-    public func addProperty(_ name: String, type: PropertyType, required: Bool = true) -> ClassBuilder {
-        properties[name] = type
-        if required {
-            self.required.insert(name)
-        }
-        return self
-    }
-
-    public var allProperties: [String: PropertyType] {
-        properties
-    }
-
-    public func buildSchema() -> JSONSchema {
-        var props: [String: JSONSchema] = [:]
-        for (name, type) in properties {
-            props[name] = type.toJSONSchema()
-        }
-        return .object(
-            properties: props,
-            required: Array(required).sorted()
-        )
-    }
-
-    public func generateSwiftStruct() -> String {
-        var lines: [String] = []
-        lines.append("public struct \(name): Codable, Sendable {")
-        for (propName, propType) in properties.sorted(by: { $0.key < $1.key }) {
-            let swiftType = propType.toSwiftType()
-            lines.append("    public let \(propName): \(swiftType)")
-        }
-        lines.append("}")
-        return lines.joined(separator: "\n")
-    }
-}
-
-// MARK: - Enum Builder (legacy - for backwards compat)
-
-/// Legacy enum builder for building schemas
-public class EnumBuilder: @unchecked Sendable {
-    public let name: String
-    private var values: [EnumValue] = []
-
-    public init(name: String) {
-        self.name = name
-    }
-
-    @discardableResult
-    public func addValue(_ name: String, alias: String? = nil) -> EnumBuilder {
-        values.append(EnumValue(name: name, alias: alias))
-        return self
-    }
-
-    public var allValues: [EnumValue] {
-        values
-    }
-
-    public var valueStrings: [String] {
-        values.map { $0.stringValue }
-    }
-
-    public func buildSchema() -> JSONSchema {
-        .enum(values: valueStrings)
-    }
-
-    public func generateSwiftEnum() -> String {
-        var lines: [String] = []
-        lines.append("public enum \(name): String, Codable, Sendable {")
-        for value in values {
-            let caseName = value.name.lowercased()
-            lines.append("    case \(caseName) = \"\(value.stringValue)\"")
-        }
-        lines.append("}")
-        return lines.joined(separator: "\n")
-    }
-}
-
-// MARK: - PropertyType Extensions
-
-extension PropertyType {
-    func toSwiftType() -> String {
-        switch self {
-        case .string: return "String"
-        case .int: return "Int"
-        case .float: return "Double"
-        case .bool: return "Bool"
-        case .optional(let inner): return "\(inner.toSwiftType())?"
-        case .array(let element): return "[\(element.toSwiftType())]"
-        case .map(_, let value): return "[String: \(value.toSwiftType())]"
-        case .reference(let name): return name
-        }
-    }
-}

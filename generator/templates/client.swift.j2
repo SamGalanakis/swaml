@@ -59,6 +59,11 @@ public actor BamlAsyncClientFFI {
         argsDict["{{ param.baml_name }}"] = {{ param.name }}
 {% endfor %}
 
+        // Add TypeBuilder serialization if present
+        if let tb = options?.typeBuilder {
+            argsDict["__type_builder__"] = tb.toSerializable()
+        }
+
         // Encode arguments as JSON
         let argsData = try JSONSerialization.data(withJSONObject: argsDict)
 
@@ -84,6 +89,11 @@ public actor BamlAsyncClientFFI {
 {% for param in func.params %}
                     argsDict["{{ param.baml_name }}"] = {{ param.name }}
 {% endfor %}
+
+                    // Add TypeBuilder serialization if present
+                    if let tb = options?.typeBuilder {
+                        argsDict["__type_builder__"] = tb.toSerializable()
+                    }
 
                     let argsData = try JSONSerialization.data(withJSONObject: argsDict)
 

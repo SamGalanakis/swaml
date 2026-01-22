@@ -64,6 +64,31 @@ public final class BamlTypeBuilder: TypeBuilder, @unchecked Sendable {
     }
 {% endif %}
 {% endfor %}
+
+    // MARK: - Class Type Viewers
+{% for c in classes %}
+
+    /// Type viewer for {{ c.name }}.
+    /// Use `.type()` to get a FieldType reference.
+    public var {{ c.name }}: ClassTypeViewer {
+        ClassTypeViewer(name: "{{ c.name }}")
+    }
+{% endfor %}
+}
+
+/// Viewer for schema-defined classes (provides type references)
+public struct ClassTypeViewer: Sendable {
+    /// Name of the class
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+
+    /// Get a FieldType reference to this class
+    public func type() -> FieldType {
+        .reference(name)
+    }
 }
 
 // MARK: - Convenience Extensions

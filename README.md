@@ -210,35 +210,103 @@ let repaired = JSONExtractor.repair(malformed)
 
 ### Dynamic Type Building
 
-Build schemas at runtime for dynamic use cases:
+Build schemas at runtime for dynamic use cases. The TypeBuilder API matches Python BAML's capabilities.
+
+#### Fluent Type Creation
 
 ```swift
 let tb = TypeBuilder()
 
-// Add dynamic enum values at runtime
-tb.enumBuilder("MomentId")
-    .addValue("moment_1")
-    .addValue("moment_2")
-    .addValue("moment_3")
+// Primitive types
+let stringType = tb.string()
+let intType = tb.int()
+let floatType = tb.float()
+let boolType = tb.bool()
 
-// Get all dynamic enum values
-let dynamicValues = tb.dynamicEnumValues()
-// ["MomentId": ["moment_1", "moment_2", "moment_3"]]
+// Literal types
+let literalStr = tb.literalString("active")
+let literalInt = tb.literalInt(42)
 
-// Build JSON schema for an enum
-let schema = tb.buildEnumSchema("MomentId")
+// Composite types
+let listOfStrings = tb.list(tb.string())
+let mapType = tb.map(key: tb.string(), value: tb.int())
+let unionType = tb.union(tb.string(), tb.int())
 ```
 
-#### Class Builder
+#### Chainable Modifiers
 
 ```swift
-let builder = ClassBuilder(name: "Task")
-    .addProperty("title", type: .string)
-    .addProperty("priority", type: .reference("Priority"))
-    .addProperty("tags", type: .array(.string))
-    .addProperty("dueDate", type: .optional(.string))
+// Chain .list() and .optional() modifiers
+let optionalInt = tb.int().optional()
+let listOfStrings = tb.string().list()
+let optionalListOfInts = tb.int().list().optional()
+```
 
-let schema = builder.buildSchema()
+#### Dynamic Enums with Metadata
+
+```swift
+// Add values with description and alias
+let categoryEnum = tb.addEnum("Category")
+categoryEnum.addValue("TECH").description("Technology topics").alias("tech")
+categoryEnum.addValue("SPORTS").description("Sports related")
+categoryEnum.addValue("NEWS")
+
+// Get a type reference to use in classes
+let categoryType = categoryEnum.type()
+
+// Access all values
+let values = tb.dynamicEnumValues()
+// ["Category": ["TECH", "SPORTS", "NEWS"]]
+```
+
+#### Dynamic Classes
+
+```swift
+// Create a class with typed properties
+let person = tb.addClass("Person")
+person.addProperty("name", tb.string()).description("Full name")
+person.addProperty("age", tb.int().optional())
+person.addProperty("email", tb.string()).alias("emailAddress")
+person.addProperty("tags", tb.string().list())
+
+// Reference other types
+person.addProperty("category", categoryEnum.type())
+
+// Build JSON Schema
+let schema = person.buildSchema()
+```
+
+#### FFI Serialization
+
+```swift
+// Serialize for passing to Rust FFI runtime
+let serializable = tb.toSerializable()
+let jsonData = try tb.toJSON()
+let jsonString = try tb.toJSONString(prettyPrinted: true)
+```
+
+#### Generated TypeBuilder
+
+When using the code generator with `@@dynamic` enums, a `BamlTypeBuilder` subclass is generated with typed accessors:
+
+```swift
+let tb = BamlTypeBuilder()
+
+// Access dynamic enums by name
+tb.MomentId.addValue("moment_123")
+tb.PatternId.addValue("pattern_456")
+
+// Access static enum viewers
+let statusValues = tb.Status.listValues()
+
+// Access class type references
+let personType = tb.Person.type()
+
+// Use with function calls
+let result = try await client.extract(
+    text: input,
+    options: .with(typeBuilder: tb)
+)
 ```
 
 ### BamlValue for Dynamic Access

@@ -1,43 +1,5 @@
 import Foundation
 
-/// Represents a property type in the schema
-public indirect enum PropertyType: Sendable, Equatable {
-    case string
-    case int
-    case float
-    case bool
-    case optional(PropertyType)
-    case array(PropertyType)
-    case map(key: PropertyType, value: PropertyType)
-    case reference(String) // Reference to another class/enum
-
-    /// Convert to JSON Schema representation
-    public func toJSONSchema() -> JSONSchema {
-        switch self {
-        case .string:
-            return .string
-        case .int:
-            return .integer
-        case .float:
-            return .number
-        case .bool:
-            return .boolean
-        case .optional(let inner):
-            return .anyOf([inner.toJSONSchema(), .null])
-        case .array(let element):
-            return .array(items: element.toJSONSchema())
-        case .map(_, let value):
-            return .object(
-                properties: [:],
-                required: [],
-                additionalProperties: value.toJSONSchema()
-            )
-        case .reference(let name):
-            return .ref(name)
-        }
-    }
-}
-
 /// JSON Schema representation for validation and LLM structured output
 public indirect enum JSONSchema: Sendable, Equatable {
     case string

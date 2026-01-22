@@ -83,13 +83,13 @@ public struct OutputParser {
     private static func applySchemaCoercion(_ value: BamlValue, schema: JSONSchema) throws -> BamlValue {
         switch schema {
         case .string:
-            return try TypeCoercion.coerce(value, to: .string)
+            return try TypeCoercion.coerce(value, to: FieldType.string)
         case .integer:
-            return try TypeCoercion.coerce(value, to: .int)
+            return try TypeCoercion.coerce(value, to: FieldType.int)
         case .number:
-            return try TypeCoercion.coerce(value, to: .float)
+            return try TypeCoercion.coerce(value, to: FieldType.float)
         case .boolean:
-            return try TypeCoercion.coerce(value, to: .bool)
+            return try TypeCoercion.coerce(value, to: FieldType.bool)
         case .null:
             if value.isNull {
                 return value
@@ -113,7 +113,7 @@ public struct OutputParser {
             return .map(dict)
         case .enum:
             // Enum values should be strings
-            return try TypeCoercion.coerce(value, to: .string)
+            return try TypeCoercion.coerce(value, to: FieldType.string)
         case .ref:
             // References are resolved at a higher level
             return value

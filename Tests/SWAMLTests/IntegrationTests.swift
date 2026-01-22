@@ -235,14 +235,14 @@ final class IntegrationTests: XCTestCase {
         let tb = TypeBuilder()
 
         // Add values to dynamic enums (like MomentId, PatternId in BAML)
-        tb.enumBuilder("MomentId")
-            .addValue("moment_emma_1")
-            .addValue("moment_emma_2")
-            .addValue("moment_jake_1")
+        let momentEnum = tb.enumBuilder("MomentId")
+        momentEnum.addValue("moment_emma_1")
+        momentEnum.addValue("moment_emma_2")
+        momentEnum.addValue("moment_jake_1")
 
-        tb.enumBuilder("PatternId")
-            .addValue("pattern_1")
-            .addValue("pattern_2")
+        let patternEnum = tb.enumBuilder("PatternId")
+        patternEnum.addValue("pattern_1")
+        patternEnum.addValue("pattern_2")
 
         // Verify enum values are stored
         let momentValues = tb.dynamicEnumValues()["MomentId"]
@@ -309,12 +309,14 @@ final class IntegrationTests: XCTestCase {
             "Shark", "Tiger", "Turtle", "Wolf"
         ]
 
-        let builder = EnumBuilder(name: "FriendAnimalArchetype")
+        let tb = TypeBuilder()
+        let builder = tb.addEnum("FriendAnimalArchetype")
         for animal in animals {
             builder.addValue(animal)
         }
 
-        let schema = builder.buildSchema()
+        let schema = tb.buildEnumSchema("FriendAnimalArchetype")
+        XCTAssertNotNil(schema)
 
         if case .enum(let values) = schema {
             XCTAssertEqual(values.count, animals.count)
@@ -323,13 +325,6 @@ final class IntegrationTests: XCTestCase {
         } else {
             XCTFail("Expected enum schema")
         }
-
-        // Test Swift code generation
-        let code = builder.generateSwiftEnum()
-        XCTAssertTrue(code.contains("public enum FriendAnimalArchetype"))
-        XCTAssertTrue(code.contains("case ant"))
-        // PolarBear becomes polarbear (no word boundary to detect camelCase)
-        XCTAssertTrue(code.contains("case polarbear"))
     }
 
     // MARK: - Schema Coercion
