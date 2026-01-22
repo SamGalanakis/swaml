@@ -35,6 +35,12 @@ public enum BamlError: Error, LocalizedError, Sendable {
     /// Internal error
     case internalError(String)
 
+    /// FFI runtime creation failed
+    case runtimeCreationFailed(String)
+
+    /// FFI function call failed
+    case ffiError(String)
+
     public var errorDescription: String? {
         switch self {
         case .networkError(let message):
@@ -59,6 +65,10 @@ public enum BamlError: Error, LocalizedError, Sendable {
             return "Configuration error: \(message)"
         case .internalError(let message):
             return "Internal error: \(message)"
+        case .runtimeCreationFailed(let message):
+            return "Failed to create BAML runtime: \(message)"
+        case .ffiError(let message):
+            return "FFI error: \(message)"
         }
     }
 }

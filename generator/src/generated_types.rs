@@ -227,7 +227,7 @@ fn convert_jinja_to_swift(template: &str, params: &[ParamSwift]) -> String {
     result = var_regex.replace_all(&result, |caps: &regex::Captures| {
         let var_name = &caps[1];
         // Convert snake_case to camelCase
-        let swift_var = crate::swift_types::snake_to_camel(var_name);
+        let swift_var = crate::utils::to_swift_identifier(var_name);
         // Check if this is a param that needs JSON encoding (complex types)
         let param = params.iter().find(|p| p.baml_name == var_name);
         if let Some(p) = param {

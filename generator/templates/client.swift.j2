@@ -31,7 +31,82 @@ public struct BamlCallOptions: Sendable {
     }
 }
 
-/// Async BAML client with all generated functions
+#if BAML_FFI_ENABLED
+
+// MARK: - FFI-Based Client (uses BAML Rust runtime)
+
+/// Async BAML client using the FFI runtime (BAML Rust backend)
+public actor BamlAsyncClientFFI {
+    private let runtime: BamlRuntimeFFI
+
+    public init(runtime: BamlRuntimeFFI) {
+        self.runtime = runtime
+    }
+{% for func in functions %}
+
+{% if func.docstring.is_some() %}
+    /// {{ func.docstring.as_ref().unwrap() }}
+{% endif %}
+    public func {{ func.name }}(
+{% for param in func.params %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
+{% endfor %}
+        options: BamlCallOptions? = nil
+    ) async throws -> {{ func.return_type_string() }} {
+        // Build arguments dictionary
+        var argsDict: [String: Any] = [:]
+{% for param in func.params %}
+        argsDict["{{ param.baml_name }}"] = {{ param.name }}
+{% endfor %}
+
+        // Encode arguments as JSON
+        let argsData = try JSONSerialization.data(withJSONObject: argsDict)
+
+        // Call FFI runtime
+        let resultData = try await runtime.callFunction("{{ func.baml_name }}", args: argsData)
+
+        // Decode result
+        return try JSONDecoder().decode({{ func.return_type_string() }}.self, from: resultData)
+    }
+
+    /// Stream {{ func.name }} with partial results
+    public func {{ func.name }}Stream(
+{% for param in func.params %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
+{% endfor %}
+        options: BamlCallOptions? = nil
+    ) -> AsyncThrowingStream<Partial{{ func.return_type_string() }}, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // Build arguments dictionary
+                    var argsDict: [String: Any] = [:]
+{% for param in func.params %}
+                    argsDict["{{ param.baml_name }}"] = {{ param.name }}
+{% endfor %}
+
+                    let argsData = try JSONSerialization.data(withJSONObject: argsDict)
+
+                    for try await chunk in runtime.callFunctionStream("{{ func.baml_name }}", args: argsData) {
+                        if let partial = try? JSONDecoder().decode(Partial{{ func.return_type_string() }}.self, from: chunk) {
+                            continuation.yield(partial)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+{% endfor %}
+}
+
+#endif // BAML_FFI_ENABLED
+
+// MARK: - Pure Swift Client (uses SWAML runtime)
+
+/// Async BAML client using the pure Swift runtime
 public actor BamlAsyncClient {
     private let runtime: BamlRuntime
 
@@ -120,6 +195,52 @@ public final class BamlSyncClient: @unchecked Sendable {
     }
 {% endfor %}
 }
+
+#if BAML_FFI_ENABLED
+
+/// Sync wrapper for BamlAsyncClientFFI (for non-async contexts)
+public final class BamlSyncClientFFI: @unchecked Sendable {
+    private let asyncClient: BamlAsyncClientFFI
+
+    public init(runtime: BamlRuntimeFFI) {
+        self.asyncClient = BamlAsyncClientFFI(runtime: runtime)
+    }
+{% for func in functions %}
+
+{% if func.docstring.is_some() %}
+    /// {{ func.docstring.as_ref().unwrap() }}
+{% endif %}
+    public func {{ func.name }}(
+{% for param in func.params %}
+        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
+{% endfor %}
+        options: BamlCallOptions? = nil
+    ) throws -> {{ func.return_type_string() }} {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Result<{{ func.return_type_string() }}, Error>!
+
+        Task {
+            do {
+                let value = try await asyncClient.{{ func.name }}(
+{% for param in func.params %}
+                    {{ param.name }}: {{ param.name }},
+{% endfor %}
+                    options: options
+                )
+                result = .success(value)
+            } catch {
+                result = .failure(error)
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+        return try result.get()
+    }
+{% endfor %}
+}
+
+#endif // BAML_FFI_ENABLED
 
 /// Protocol for types that can be converted to BamlValue
 public protocol BamlValueConvertible {

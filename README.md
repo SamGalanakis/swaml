@@ -18,6 +18,60 @@ targets: [
 ]
 ```
 
+## Runtime Options
+
+SWAML provides two runtime options:
+
+### Pure Swift Runtime (Default)
+
+The pure Swift runtime works out of the box with no additional setup:
+
+```swift
+import SWAML
+
+let runtime = await BamlRuntime.openRouter(
+    apiKey: "your-api-key",
+    model: "anthropic/claude-sonnet-4-20250514"
+)
+```
+
+### FFI Runtime (BAML Rust Backend)
+
+For full BAML compatibility including `ctx.output_format`, streaming, and all BAML Rust runtime features, use the FFI runtime:
+
+```swift
+import SWAML
+
+// Initialize with embedded BAML sources
+let runtime = try BamlRuntimeFFI(
+    rootPath: "baml_src",
+    sourceFiles: bamlSources,  // Generated from your .baml files
+    envVars: ["OPENAI_API_KEY": ProcessInfo.processInfo.environment["OPENAI_API_KEY"]!]
+)
+
+// Use generated client
+let client = BamlAsyncClientFFI(runtime: runtime)
+let result = try await client.extractResume(text: resumeText)
+```
+
+#### Building the FFI XCFramework
+
+To use the FFI runtime, you need to build the BAML Rust library:
+
+```bash
+# Build XCFramework for iOS/macOS
+./scripts/build-xcframework.sh
+```
+
+This creates `BamlFFI.xcframework` containing:
+- iOS Device (arm64)
+- iOS Simulator (arm64)
+- macOS (arm64 + x86_64 universal)
+
+Then in your Xcode project:
+1. Add `BamlFFI.xcframework` to your target
+2. Define `BAML_FFI_ENABLED` in your build settings
+
 ## Quick Start
 
 ### 1. Configure a Client
@@ -130,18 +184,30 @@ Build schemas at runtime for dynamic use cases:
 ```swift
 let tb = TypeBuilder()
 
-tb.addEnum("Priority")
-    .addValue("LOW")
-    .addValue("MEDIUM")
-    .addValue("HIGH")
+// Add dynamic enum values at runtime
+tb.enumBuilder("MomentId")
+    .addValue("moment_1")
+    .addValue("moment_2")
+    .addValue("moment_3")
 
-tb.addClass("Task")
+// Get all dynamic enum values
+let dynamicValues = tb.dynamicEnumValues()
+// ["MomentId": ["moment_1", "moment_2", "moment_3"]]
+
+// Build JSON schema for an enum
+let schema = tb.buildEnumSchema("MomentId")
+```
+
+#### Class Builder
+
+```swift
+let builder = ClassBuilder(name: "Task")
     .addProperty("title", type: .string)
     .addProperty("priority", type: .reference("Priority"))
     .addProperty("tags", type: .array(.string))
     .addProperty("dueDate", type: .optional(.string))
 
-let schema = try tb.buildSchema(root: "Task")
+let schema = builder.buildSchema()
 ```
 
 ### BamlValue for Dynamic Access
@@ -212,6 +278,21 @@ let response = try await runtime.complete(
 | `class Foo` | `struct Foo: Codable` |
 | `enum Bar` | `enum Bar: String, Codable` |
 
+## Code Generation
+
+SWAML includes a code generator that produces Swift types from BAML definitions:
+
+```bash
+# Generate Swift code from BAML files
+baml-swift generate --input ./baml_src --output ./Sources/BamlClient
+```
+
+Generated files:
+- `Types.swift` - Structs and enums from your BAML schema
+- `BamlClient.swift` - Type-safe client with all your BAML functions
+- `Globals.swift` - Client configurations
+- `TypeBuilder.swift` - Dynamic type support for `@@dynamic` enums
+
 ## Example: Chat Analysis
 
 ```swift
@@ -253,6 +334,11 @@ print(analysis.topics)
 
 - Swift 5.9+
 - macOS 13+ / iOS 16+ / Linux
+
+### FFI Runtime Additional Requirements
+
+- Rust toolchain with iOS targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
+- Xcode 15+
 
 ## License
 
