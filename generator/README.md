@@ -102,25 +102,72 @@ npx @boundaryml/baml serve --port 2024
 
 ---
 
-## Alternative: Native Swift Generation (Advanced)
+## Alternative: Native Swift Generation (Recommended)
 
-This generator produces native Swift code directly from BAML's intermediate representation (IR), without requiring the REST server. This approach is useful for:
+This generator produces native Swift code directly from BAML files, without requiring the REST server. This approach is useful for:
 
 - Embedding generated code directly in your Swift package
 - Avoiding network overhead of REST calls
 - Full control over the generated code
+- End-to-end BAML → Swift workflow
 
 ### How It Works
 
 ```
 .baml files → [BAML Parser] → BamlIR → [Swift Generator] → Swift code
                     ↑                           ↑
-              (from BAML CLI)            (this crate)
+           (internal-baml-core)          (this crate)
 ```
 
-**Note:** This generator takes `BamlIR` as input. The BAML parser is part of BAML's Rust crates (`internal-baml-core`). For now, you need to construct the IR programmatically or integrate with BAML's tooling.
+### CLI Usage (Recommended)
+
+The easiest way to generate Swift code from BAML files:
+
+```bash
+# Install the CLI
+cargo install --git https://github.com/SamGalanakis/swaml --features cli baml-swift
+
+# Generate Swift from BAML files
+baml-swift --input ./baml_src --output ./Sources/BamlClient
+
+# With options
+baml-swift \
+    --input ./baml_src \
+    --output ./Sources/Generated \
+    --package MyBamlTypes \
+    --streaming \
+    --verbose
+```
+
+**CLI Options:**
+- `-i, --input <DIR>` - Directory containing .baml files (default: `baml_src`)
+- `-o, --output <DIR>` - Output directory for Swift code (default: `baml_client`)
+- `-p, --package <NAME>` - Swift package name (default: `BamlClient`)
+- `--streaming` - Generate streaming type variants
+- `-v, --verbose` - Verbose output
 
 ### Usage as Rust Library
+
+**With BAML file parsing (recommended):**
+
+```rust
+use baml_generator_swift::{parse_baml_dir, SwiftGenerator};
+use std::path::Path;
+
+// Parse BAML files from a directory
+let ir = parse_baml_dir(Path::new("./baml_src"))?;
+
+// Generate Swift code
+let generator = SwiftGenerator::with_defaults();
+let files = generator.generate(&ir)?;
+
+// Write files
+for (path, content) in files.files().iter() {
+    std::fs::write(path, content)?;
+}
+```
+
+**With manual IR construction:**
 
 ```rust
 use baml_generator_swift::{
@@ -167,7 +214,7 @@ let generator = SwiftGenerator::with_defaults();
 let files = generator.generate(&ir)?;
 
 // Write files
-for (path, content) in files.iter() {
+for (path, content) in files.files().iter() {
     std::fs::write(path, content)?;
 }
 ```
@@ -273,9 +320,10 @@ let result: SentimentResult = try OutputParser.parse(
 
 The goal is to add Swift as a first-class BAML target language:
 
-1. **Current state**: OpenAPI works, native generator needs BAML parser integration
-2. **Next step**: Integrate with `internal-baml-core` to parse `.baml` files directly
-3. **Future**: Contribute Swift generator upstream to BAML repository
+1. **Done**: Native Swift generator with full type support
+2. **Done**: Direct BAML file parsing via `internal-baml-core` integration
+3. **Done**: CLI tool for end-to-end workflow (`baml-swift`)
+4. **Future**: Contribute Swift generator upstream to BAML repository
 
 ### Contributing to BAML
 
@@ -294,13 +342,25 @@ To add native Swift support to BAML itself, you would:
 
 ```bash
 cd generator
+
+# Build library only
 cargo build --release
+
+# Build with BAML parsing support
+cargo build --release --features baml-ir
+
+# Build CLI
+cargo build --release --features cli
 ```
 
 ### Running Tests
 
 ```bash
+# Run all tests
 cargo test
+
+# Run tests with BAML parsing
+cargo test --features baml-ir
 ```
 
 ### Test Fixtures

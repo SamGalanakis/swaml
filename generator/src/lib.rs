@@ -25,6 +25,13 @@ pub mod utils;
 mod functions;
 mod swift_types;
 
+// BAML parser integration (requires baml-ir feature)
+#[cfg(feature = "baml-ir")]
+pub mod baml_parser;
+
+#[cfg(feature = "baml-ir")]
+pub use baml_parser::{parse_baml_dir, parse_baml_string};
+
 use anyhow::Result;
 use askama::Template;
 

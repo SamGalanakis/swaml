@@ -11,6 +11,9 @@ repository = "https://github.com/boundaryml/baml"
 baml-types = { git = "https://github.com/BoundaryML/baml", package = "baml-types", optional = true }
 internal-baml-core = { git = "https://github.com/BoundaryML/baml", package = "internal-baml-core", optional = true }
 
+# CLI
+clap = { version = "4.0", features = ["derive"], optional = true }
+
 # Template engine
 askama = "0.12"
 
@@ -38,3 +41,8 @@ pretty_assertions = "1.4"
 [features]
 default = []
 baml-ir = ["baml-types", "internal-baml-core"]
+cli = ["baml-ir", "clap"]
+
+[[bin]]
+name = "baml-swift"
+required-features = ["cli"]
