@@ -24,24 +24,21 @@ public enum Baml {
         }
     }
 
-    /// Configure the BAML runtime with default settings from environment
+    /// Configure the BAML runtime
+    /// You must call this with a runtime or registry that has API keys configured
+    /// Example:
+    /// ```
+    /// let registry = ClientRegistry()
+    /// await registry.register(
+    ///     name: "default",
+    ///     provider: .openAI(apiKey: apiKey),
+    ///     model: "gpt-4",
+    ///     isDefault: true
+    /// )
+    /// Baml.configure(clientRegistry: registry)
+    /// ```
     public static func configure() async {
-        let registry = ClientRegistry()
-
-        // Register clients from generated config
-{% for config in client_configs %}
-        await registry.register(
-            name: "{{ config.name }}",
-            provider: {{ config.provider_init() }},
-            model: "{{ config.model }}",
-            isDefault: {% if loop.first %}true{% else %}false{% endif %}
-        )
-{% endfor %}
-
-        lock.lock()
-        _runtime = BamlRuntime(clientRegistry: registry)
-        _client = BamlAsyncClient(runtime: _runtime!)
-        lock.unlock()
+        fatalError("Baml.configure() requires API keys. Use Baml.configure(runtime:) or Baml.configure(clientRegistry:) instead.")
     }
 
     /// Configure with a custom runtime
