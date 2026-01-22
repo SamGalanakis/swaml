@@ -17,12 +17,31 @@ let package = Package(
             targets: ["SWAML"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.28.0"),
+    ],
     targets: [
+        // C wrapper for BAML FFI - handles struct-by-value returns
+        .target(
+            name: "BamlFFIC",
+            dependencies: [],
+            path: "Sources/BamlFFIC",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("include")
+            ]
+        ),
         // Main SWAML target - pure Swift runtime with optional FFI support
         .target(
             name: "SWAML",
-            dependencies: [],
-            path: "Sources/SWAML"
+            dependencies: [
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                "BamlFFIC",
+            ],
+            path: "Sources/SWAML",
+            swiftSettings: [
+                .define("BAML_FFI_ENABLED")
+            ]
         ),
         .testTarget(
             name: "SWAMLTests",

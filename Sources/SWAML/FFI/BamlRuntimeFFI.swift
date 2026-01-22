@@ -41,7 +41,10 @@ public enum BamlFFIError: Error, LocalizedError, Sendable {
 
 /// Structured validation error info with raw output for repair
 public struct BamlValidationErrorInfo: Sendable, Equatable {
-    /// The validation error message
+    /// Maximum length for error message (for display purposes)
+    private static let maxMessageLength = 200
+
+    /// The validation error message (truncated for display, full version in fullMessage)
     public let message: String
     /// The raw LLM output that failed validation (if available)
     public let rawOutput: String?
@@ -49,7 +52,12 @@ public struct BamlValidationErrorInfo: Sendable, Equatable {
     public let prompt: String?
 
     public init(message: String, rawOutput: String? = nil, prompt: String? = nil) {
-        self.message = message
+        // Truncate message for cleaner error display
+        if message.count > Self.maxMessageLength {
+            self.message = String(message.prefix(Self.maxMessageLength)) + "... [truncated]"
+        } else {
+            self.message = message
+        }
         self.rawOutput = rawOutput
         self.prompt = prompt
     }
@@ -378,6 +386,31 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
     deinit {
         BamlFFI.destroyRuntime(runtime)
     }
+
+    #if BAML_FFI_ENABLED
+    /// Call a BAML function with protobuf-encoded arguments
+    /// - Parameters:
+    ///   - name: Name of the function to call
+    ///   - arguments: HostFunctionArguments containing the function parameters
+    /// - Returns: JSON-encoded result data
+    /// - Throws: BamlFFIError on failure
+    public func callFunctionProto(_ name: String, arguments: HostFunctionArguments) async throws -> Data {
+        let args: Data
+        do {
+            args = try arguments.serializedData()
+        } catch {
+            throw BamlFFIError.encodingError("Failed to serialize arguments: \(error)")
+        }
+        let responseData = try await callFunction(name, args: args)
+
+        // Decode protobuf response to JSON
+        do {
+            return try decodeFFIResponse(responseData)
+        } catch {
+            throw BamlFFIError.decodingError("Failed to decode FFI response: \(error)")
+        }
+    }
+    #endif
 
     /// Call a BAML function asynchronously
     /// - Parameters:
