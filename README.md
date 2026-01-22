@@ -54,9 +54,9 @@ let client = BamlAsyncClientFFI(runtime: runtime)
 let result = try await client.extractResume(text: resumeText)
 ```
 
-#### Building the FFI XCFramework
+The FFI runtime communicates with the Rust backend using Protocol Buffers for efficient serialization.
 
-To use the FFI runtime, you need to build the BAML Rust library:
+#### Building for iOS/macOS (XCFramework)
 
 ```bash
 # Build XCFramework for iOS/macOS
@@ -71,6 +71,37 @@ This creates `BamlFFI.xcframework` containing:
 Then in your Xcode project:
 1. Add `BamlFFI.xcframework` to your target
 2. Define `BAML_FFI_ENABLED` in your build settings
+
+#### Building for Linux
+
+```bash
+# Build shared library for Linux
+./scripts/build-linux.sh
+```
+
+This creates `lib/libbaml_ffi.so`. Configure your `Package.swift`:
+
+```swift
+targets: [
+    .target(
+        name: "YourApp",
+        dependencies: ["SWAML"],
+        swiftSettings: [
+            .define("BAML_FFI_ENABLED")
+        ],
+        linkerSettings: [
+            .linkedLibrary("baml_ffi", .when(platforms: [.linux])),
+            .unsafeFlags(["-Llib"], .when(platforms: [.linux]))
+        ]
+    ),
+]
+```
+
+Run with the library path:
+
+```bash
+LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH swift run YourApp
+```
 
 ## Quick Start
 
@@ -337,8 +368,13 @@ print(analysis.topics)
 
 ### FFI Runtime Additional Requirements
 
+**Apple Platforms:**
 - Rust toolchain with iOS targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
 - Xcode 15+
+
+**Linux:**
+- Rust toolchain: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- Build dependencies: `apt install build-essential pkg-config libssl-dev`
 
 ## License
 

@@ -1,156 +1,196 @@
 import Foundation
 
-// FFI code is only available when the BamlFFI xcframework is linked.
-// To enable FFI support:
-// 1. Run ./scripts/build-xcframework.sh to build BamlFFI.xcframework
-// 2. Add the xcframework to your Xcode project
-// 3. Define BAML_FFI_ENABLED in your build settings
-
-#if BAML_FFI_ENABLED
-
 // MARK: - FFI Buffer Structure
 
-/// Buffer structure matching the C definition from baml_cffi_generated.h
-/// Used to pass data between Rust and Swift
+/// Buffer structure for FFI data exchange
 public struct BamlBuffer {
-    /// Pointer to the buffer data
     public let ptr: UnsafePointer<Int8>?
-    /// Length of the buffer data
     public let len: Int
 
-    /// Initialize an empty buffer
     public init() {
         self.ptr = nil
         self.len = 0
     }
 
-    /// Initialize with pointer and length
     public init(ptr: UnsafePointer<Int8>?, len: Int) {
         self.ptr = ptr
         self.len = len
     }
 
-    /// Convert buffer contents to Data
     public func toData() -> Data? {
         guard let ptr = ptr, len > 0 else { return nil }
         return Data(bytes: ptr, count: len)
     }
 
-    /// Convert buffer contents to String
     public func toString() -> String? {
         guard let data = toData() else { return nil }
         return String(data: data, encoding: .utf8)
     }
 }
 
-// MARK: - C Function Declarations
+// MARK: - Dynamic Library Loading
 
-/// Create a new BAML runtime instance
-/// - Parameters:
-///   - rootPath: Root path for BAML files
-///   - srcFilesJson: JSON-encoded dictionary of source file paths to contents
-///   - envVarsJson: JSON-encoded dictionary of environment variables
-/// - Returns: Opaque pointer to the runtime, or nil on failure
-@_silgen_name("create_baml_runtime")
-public func baml_create_runtime(
-    _ rootPath: UnsafePointer<CChar>,
-    _ srcFilesJson: UnsafePointer<CChar>,
-    _ envVarsJson: UnsafePointer<CChar>
-) -> UnsafeMutableRawPointer?
+/// Manages dynamic loading of the BAML FFI library
+public final class BamlFFILoader: @unchecked Sendable {
+    public static let shared = BamlFFILoader()
 
-/// Destroy a BAML runtime instance
-/// - Parameter runtime: Pointer to the runtime to destroy
-@_silgen_name("destroy_baml_runtime")
-public func baml_destroy_runtime(_ runtime: UnsafeRawPointer)
+    private var handle: UnsafeMutableRawPointer?
+    private var _isLoaded = false
+    private let lock = NSLock()
 
-/// Call a BAML function synchronously (starts async execution)
-/// - Parameters:
-///   - runtime: Pointer to the BAML runtime
-///   - functionName: Name of the function to call
-///   - encodedArgs: MessagePack-encoded arguments
-///   - length: Length of the encoded arguments
-///   - callId: Unique identifier for this call (used for callback routing)
-/// - Returns: Buffer containing invocation handle or error
-@_silgen_name("call_function_from_c")
-public func baml_call_function(
-    _ runtime: UnsafeRawPointer,
-    _ functionName: UnsafePointer<CChar>,
-    _ encodedArgs: UnsafePointer<Int8>,
-    _ length: Int,
-    _ callId: UInt32
-) -> BamlBuffer
+    public var isLoaded: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isLoaded
+    }
 
-/// Call a BAML function with streaming
-/// - Parameters:
-///   - runtime: Pointer to the BAML runtime
-///   - functionName: Name of the function to call
-///   - encodedArgs: MessagePack-encoded arguments
-///   - length: Length of the encoded arguments
-///   - callId: Unique identifier for this call (used for callback routing)
-/// - Returns: Buffer containing stream handle or error
-@_silgen_name("call_function_stream_from_c")
-public func baml_call_function_stream(
-    _ runtime: UnsafeRawPointer,
-    _ functionName: UnsafePointer<CChar>,
-    _ encodedArgs: UnsafePointer<Int8>,
-    _ length: Int,
-    _ callId: UInt32
-) -> BamlBuffer
+    private init() {
+        #if os(Linux)
+        let libNames = ["libbaml_ffi.so", "baml_ffi.so"]
+        #elseif os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+        let libNames = ["libbaml_ffi.dylib", "BamlFFI.framework/BamlFFI"]
+        #else
+        let libNames: [String] = []
+        #endif
 
-/// Call an object method (used for TypeBuilder, etc.)
-/// - Parameters:
-///   - runtime: Pointer to the BAML runtime
-///   - encodedArgs: MessagePack-encoded method call arguments
-///   - length: Length of the encoded arguments
-/// - Returns: Buffer containing result or error
-@_silgen_name("call_object_method")
-public func baml_call_object_method(
-    _ runtime: UnsafeRawPointer,
-    _ encodedArgs: UnsafePointer<Int8>,
-    _ length: Int
-) -> BamlBuffer
+        for name in libNames {
+            if let h = dlopen(name, RTLD_NOW | RTLD_LOCAL) {
+                handle = h
+                _isLoaded = true
+                break
+            }
+        }
+    }
 
-/// Free a buffer allocated by the Rust runtime
-/// - Parameter buffer: Buffer to free
-@_silgen_name("free_buffer")
-public func baml_free_buffer(_ buffer: BamlBuffer)
+    public func load(from path: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
 
-/// Register callbacks for async function execution
-/// - Parameters:
-///   - resultCallback: Called when a function produces a result
-///   - errorCallback: Called when a function produces an error
-///   - tickCallback: Called periodically during execution
-@_silgen_name("register_callbacks")
-public func baml_register_callbacks(
-    _ resultCallback: @escaping @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
-    _ errorCallback: @escaping @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
-    _ tickCallback: @escaping @convention(c) (UInt32) -> Void
-)
+        if _isLoaded { return }
 
-/// Get the output format JSON schema for a function
-/// - Parameters:
-///   - runtime: Pointer to the BAML runtime
-///   - functionName: Name of the function
-/// - Returns: Buffer containing JSON schema string
-@_silgen_name("get_output_format")
-public func baml_get_output_format(
-    _ runtime: UnsafeRawPointer,
-    _ functionName: UnsafePointer<CChar>
-) -> BamlBuffer
+        guard let h = dlopen(path, RTLD_NOW | RTLD_LOCAL) else {
+            let error = String(cString: dlerror())
+            throw BamlError.runtimeCreationFailed("Failed to load FFI library: \(error)")
+        }
 
-/// Render a prompt template with arguments
-/// - Parameters:
-///   - runtime: Pointer to the BAML runtime
-///   - functionName: Name of the function
-///   - encodedArgs: MessagePack-encoded arguments
-///   - length: Length of the encoded arguments
-/// - Returns: Buffer containing rendered prompt
-@_silgen_name("render_prompt")
-public func baml_render_prompt(
-    _ runtime: UnsafeRawPointer,
-    _ functionName: UnsafePointer<CChar>,
-    _ encodedArgs: UnsafePointer<Int8>,
-    _ length: Int
-) -> BamlBuffer
+        handle = h
+        _isLoaded = true
+    }
 
-#endif // BAML_FFI_ENABLED
+    func rawSymbol(_ name: String) -> UnsafeMutableRawPointer? {
+        guard let handle = handle else { return nil }
+        return dlsym(handle, name)
+    }
+
+    deinit {
+        if let handle = handle {
+            dlclose(handle)
+        }
+    }
+}
+
+// MARK: - FFI Functions
+
+/// FFI function wrappers using dynamic loading
+public enum BamlFFI {
+
+    public static var isAvailable: Bool {
+        BamlFFILoader.shared.isLoaded
+    }
+
+    public static func createRuntime(
+        rootPath: UnsafePointer<CChar>,
+        srcFilesJson: UnsafePointer<CChar>,
+        envVarsJson: UnsafePointer<CChar>
+    ) -> UnsafeMutableRawPointer? {
+        guard let sym = BamlFFILoader.shared.rawSymbol("create_baml_runtime") else {
+            return nil
+        }
+        typealias Fn = @convention(c) (UnsafePointer<CChar>, UnsafePointer<CChar>, UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
+        return unsafeBitCast(sym, to: Fn.self)(rootPath, srcFilesJson, envVarsJson)
+    }
+
+    public static func destroyRuntime(_ runtime: UnsafeRawPointer) {
+        guard let sym = BamlFFILoader.shared.rawSymbol("destroy_baml_runtime") else { return }
+        typealias Fn = @convention(c) (UnsafeRawPointer) -> Void
+        unsafeBitCast(sym, to: Fn.self)(runtime)
+    }
+
+    public static func callFunction(
+        runtime: UnsafeRawPointer,
+        functionName: UnsafePointer<CChar>,
+        encodedArgs: UnsafePointer<Int8>,
+        length: Int,
+        callId: UInt32
+    ) -> BamlBuffer {
+        guard let sym = BamlFFILoader.shared.rawSymbol("call_function_from_c") else {
+            return BamlBuffer()
+        }
+        // Returns raw pointer to buffer struct in memory
+        typealias Fn = @convention(c) (UnsafeRawPointer, UnsafePointer<CChar>, UnsafePointer<Int8>, Int, UInt32) -> UnsafeRawPointer?
+        guard let resultPtr = unsafeBitCast(sym, to: Fn.self)(runtime, functionName, encodedArgs, length, callId) else {
+            return BamlBuffer()
+        }
+        // Interpret the returned pointer as (ptr, len) struct
+        let ptr = resultPtr.assumingMemoryBound(to: UnsafePointer<Int8>?.self).pointee
+        let len = resultPtr.advanced(by: MemoryLayout<UnsafePointer<Int8>?>.stride).assumingMemoryBound(to: Int.self).pointee
+        return BamlBuffer(ptr: ptr, len: len)
+    }
+
+    public static func callFunctionStream(
+        runtime: UnsafeRawPointer,
+        functionName: UnsafePointer<CChar>,
+        encodedArgs: UnsafePointer<Int8>,
+        length: Int,
+        callId: UInt32
+    ) -> BamlBuffer {
+        guard let sym = BamlFFILoader.shared.rawSymbol("call_function_stream_from_c") else {
+            return BamlBuffer()
+        }
+        typealias Fn = @convention(c) (UnsafeRawPointer, UnsafePointer<CChar>, UnsafePointer<Int8>, Int, UInt32) -> UnsafeRawPointer?
+        guard let resultPtr = unsafeBitCast(sym, to: Fn.self)(runtime, functionName, encodedArgs, length, callId) else {
+            return BamlBuffer()
+        }
+        let ptr = resultPtr.assumingMemoryBound(to: UnsafePointer<Int8>?.self).pointee
+        let len = resultPtr.advanced(by: MemoryLayout<UnsafePointer<Int8>?>.stride).assumingMemoryBound(to: Int.self).pointee
+        return BamlBuffer(ptr: ptr, len: len)
+    }
+
+    public static func callObjectMethod(
+        runtime: UnsafeRawPointer,
+        encodedArgs: UnsafePointer<Int8>,
+        length: Int
+    ) -> BamlBuffer {
+        guard let sym = BamlFFILoader.shared.rawSymbol("call_object_method") else {
+            return BamlBuffer()
+        }
+        typealias Fn = @convention(c) (UnsafeRawPointer, UnsafePointer<Int8>, Int) -> UnsafeRawPointer?
+        guard let resultPtr = unsafeBitCast(sym, to: Fn.self)(runtime, encodedArgs, length) else {
+            return BamlBuffer()
+        }
+        let ptr = resultPtr.assumingMemoryBound(to: UnsafePointer<Int8>?.self).pointee
+        let len = resultPtr.advanced(by: MemoryLayout<UnsafePointer<Int8>?>.stride).assumingMemoryBound(to: Int.self).pointee
+        return BamlBuffer(ptr: ptr, len: len)
+    }
+
+    public static func freeBuffer(_ buffer: BamlBuffer) {
+        guard let sym = BamlFFILoader.shared.rawSymbol("free_buffer"),
+              buffer.ptr != nil else { return }
+        typealias Fn = @convention(c) (UnsafePointer<Int8>?, Int) -> Void
+        unsafeBitCast(sym, to: Fn.self)(buffer.ptr, buffer.len)
+    }
+
+    public static func registerCallbacks(
+        resultCallback: @escaping @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
+        errorCallback: @escaping @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
+        tickCallback: @escaping @convention(c) (UInt32) -> Void
+    ) {
+        guard let sym = BamlFFILoader.shared.rawSymbol("register_callbacks") else { return }
+        typealias Fn = @convention(c) (
+            @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
+            @convention(c) (UInt32, Int32, UnsafePointer<Int8>?, Int) -> Void,
+            @convention(c) (UInt32) -> Void
+        ) -> Void
+        unsafeBitCast(sym, to: Fn.self)(resultCallback, errorCallback, tickCallback)
+    }
+}

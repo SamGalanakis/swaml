@@ -70,7 +70,9 @@ extension LLMResponse {
 }
 
 /// Response format specification for structured outputs
-public enum ResponseFormat: Sendable {
+/// Note: Uses @unchecked Sendable because [String: Any] is not Sendable,
+/// but this is safe as long as callers use Sendable values in the schema.
+public enum ResponseFormat: @unchecked Sendable {
     case text
     case jsonObject
     case jsonSchema(name: String, schema: [String: Any], strict: Bool)

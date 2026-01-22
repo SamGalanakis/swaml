@@ -3,13 +3,6 @@
 
 import PackageDescription
 
-// Check if BamlFFI.xcframework exists for FFI support
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-let bamlFFIAvailable = FileManager.default.fileExists(atPath: "BamlFFI.xcframework")
-#else
-let bamlFFIAvailable = false
-#endif
-
 let package = Package(
     name: "SWAML",
     platforms: [
@@ -25,16 +18,11 @@ let package = Package(
         ),
     ],
     targets: [
-        // Main SWAML target - pure Swift runtime
+        // Main SWAML target - pure Swift runtime with optional FFI support
         .target(
             name: "SWAML",
             dependencies: [],
-            path: "Sources/SWAML",
-            exclude: [],
-            swiftSettings: [
-                // Enable FFI support when building with xcframework
-                // Users can define BAML_FFI_ENABLED to enable FFI code paths
-            ]
+            path: "Sources/SWAML"
         ),
         .testTarget(
             name: "SWAMLTests",
@@ -44,14 +32,13 @@ let package = Package(
     ]
 )
 
-// Note: To use the FFI runtime with the BAML Rust backend:
-// 1. Run: ./scripts/build-xcframework.sh
-// 2. Add BamlFFI.xcframework to your Xcode project
-// 3. Link against BamlFFI in your target's build settings
-// 4. Import both SWAML and BamlFFI in your Swift code
+// FFI Runtime Support:
+// The FFI code uses dlopen/dlsym to dynamically load the BAML library at runtime.
+// This means the package compiles without the library, but BamlRuntimeFFI will
+// throw BamlFFIError.libraryNotLoaded if you try to use it without the library.
 //
-// The FFI runtime (BamlRuntimeFFI) provides full BAML functionality including:
-// - TypeBuilder for dynamic types
-// - ctx.output_format support
-// - Streaming responses
-// - All BAML Rust runtime features
+// To use the FFI runtime:
+// 1. Build the library: ./scripts/build-xcframework.sh (Apple) or build libbaml_ffi.so (Linux)
+// 2. For Apple: Add BamlFFI.xcframework to your Xcode project
+// 3. For Linux: Ensure libbaml_ffi.so is in LD_LIBRARY_PATH
+// 4. Check BamlFFI.isAvailable before using BamlRuntimeFFI

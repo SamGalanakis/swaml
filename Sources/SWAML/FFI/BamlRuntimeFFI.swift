@@ -1,17 +1,10 @@
 import Foundation
 
-// FFI code is only available when the BamlFFI xcframework is linked.
-// To enable FFI support:
-// 1. Run ./scripts/build-xcframework.sh to build BamlFFI.xcframework
-// 2. Add the xcframework to your Xcode project
-// 3. Define BAML_FFI_ENABLED in your build settings
-
-#if BAML_FFI_ENABLED
-
 // MARK: - FFI Runtime Errors
 
 /// Errors specific to FFI runtime operations
 public enum BamlFFIError: Error, LocalizedError, Sendable {
+    case libraryNotLoaded
     case runtimeCreationFailed(String)
     case functionCallFailed(String)
     case invalidResponse(String)
@@ -19,9 +12,13 @@ public enum BamlFFIError: Error, LocalizedError, Sendable {
     case encodingError(String)
     case decodingError(String)
     case timeout
+    /// Validation error with optional raw LLM output for repair
+    case validationError(BamlValidationErrorInfo)
 
     public var errorDescription: String? {
         switch self {
+        case .libraryNotLoaded:
+            return "BAML FFI library not loaded. Ensure libbaml_ffi.so (Linux) or BamlFFI.framework (Apple) is available."
         case .runtimeCreationFailed(let msg):
             return "Failed to create BAML runtime: \(msg)"
         case .functionCallFailed(let msg):
@@ -36,7 +33,46 @@ public enum BamlFFIError: Error, LocalizedError, Sendable {
             return "Decoding error: \(msg)"
         case .timeout:
             return "Operation timed out"
+        case .validationError(let info):
+            return "Validation error: \(info.message)"
         }
+    }
+}
+
+/// Structured validation error info with raw output for repair
+public struct BamlValidationErrorInfo: Sendable, Equatable {
+    /// The validation error message
+    public let message: String
+    /// The raw LLM output that failed validation (if available)
+    public let rawOutput: String?
+    /// The prompt that was sent (if available)
+    public let prompt: String?
+
+    public init(message: String, rawOutput: String? = nil, prompt: String? = nil) {
+        self.message = message
+        self.rawOutput = rawOutput
+        self.prompt = prompt
+    }
+}
+
+/// Internal structure for parsing BAML FFI error responses
+private struct BamlErrorResponse: Decodable {
+    let message: String?
+    let error: String?
+    let rawOutput: String?
+    let raw_output: String?
+    let llmOutput: String?
+    let llm_output: String?
+    let prompt: String?
+
+    /// Get the error message from various possible fields
+    var errorMessage: String {
+        message ?? error ?? "Unknown error"
+    }
+
+    /// Get raw output from various possible fields
+    var extractedRawOutput: String? {
+        rawOutput ?? raw_output ?? llmOutput ?? llm_output
     }
 }
 
@@ -60,11 +96,12 @@ final class CallbackManager: @unchecked Sendable {
         defer { lock.unlock() }
 
         guard !callbacksRegistered else { return }
+        guard BamlFFI.isAvailable else { return }
+
         callbacksRegistered = true
 
-        baml_register_callbacks(
-            // Result callback
-            { callId, isDone, contentPtr, length in
+        BamlFFI.registerCallbacks(
+            resultCallback: { callId, isDone, contentPtr, length in
                 CallbackManager.shared.handleResult(
                     callId: callId,
                     isDone: isDone != 0,
@@ -72,8 +109,7 @@ final class CallbackManager: @unchecked Sendable {
                     length: length
                 )
             },
-            // Error callback
-            { callId, isDone, contentPtr, length in
+            errorCallback: { callId, isDone, contentPtr, length in
                 CallbackManager.shared.handleError(
                     callId: callId,
                     isDone: isDone != 0,
@@ -81,8 +117,7 @@ final class CallbackManager: @unchecked Sendable {
                     length: length
                 )
             },
-            // Tick callback (for progress/keepalive)
-            { callId in
+            tickCallback: { callId in
                 // Currently unused, but available for progress reporting
             }
         )
@@ -156,15 +191,22 @@ final class CallbackManager: @unchecked Sendable {
 
     /// Handle an error callback from FFI
     private func handleError(callId: UInt32, isDone: Bool, content: UnsafePointer<Int8>?, length: Int) {
-        let errorMessage: String
+        let error: BamlFFIError
+
         if let content = content, length > 0 {
             let data = Data(bytes: content, count: length)
-            errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-        } else {
-            errorMessage = "Unknown error"
-        }
 
-        let error = BamlFFIError.callbackError(errorMessage)
+            // Try to parse as structured JSON error first
+            if let parsedError = Self.parseStructuredError(from: data) {
+                error = parsedError
+            } else {
+                // Fall back to plain string error
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                error = Self.categorizeError(message: errorMessage)
+            }
+        } else {
+            error = BamlFFIError.callbackError("Unknown error")
+        }
 
         lock.lock()
         let continuation = pendingCalls.removeValue(forKey: callId)
@@ -177,6 +219,95 @@ final class CallbackManager: @unchecked Sendable {
             streamContinuation.finish(throwing: error)
         }
     }
+
+    /// Try to parse error data as structured JSON
+    private static func parseStructuredError(from data: Data) -> BamlFFIError? {
+        guard let response = try? JSONDecoder().decode(BamlErrorResponse.self, from: data) else {
+            return nil
+        }
+
+        let message = response.errorMessage
+        let rawOutput = response.extractedRawOutput
+
+        // If we have raw output, it's a validation error that can potentially be repaired
+        if rawOutput != nil {
+            return .validationError(BamlValidationErrorInfo(
+                message: message,
+                rawOutput: rawOutput,
+                prompt: response.prompt
+            ))
+        }
+
+        // Check if message indicates a validation error
+        if Self.isValidationError(message: message) {
+            return .validationError(BamlValidationErrorInfo(
+                message: message,
+                rawOutput: Self.extractRawOutputFromMessage(message),
+                prompt: nil
+            ))
+        }
+
+        return nil
+    }
+
+    /// Categorize a plain string error message
+    private static func categorizeError(message: String) -> BamlFFIError {
+        if isValidationError(message: message) {
+            return .validationError(BamlValidationErrorInfo(
+                message: message,
+                rawOutput: extractRawOutputFromMessage(message),
+                prompt: nil
+            ))
+        }
+        return .callbackError(message)
+    }
+
+    /// Check if an error message indicates a validation/parsing error
+    private static func isValidationError(message: String) -> Bool {
+        let lowercased = message.lowercased()
+
+        // Exclude HTTP/API errors
+        let httpErrorIndicators = [
+            "status code:", "status_code", "400", "401", "402", "403", "404",
+            "429", "500", "502", "503", "request failed", "api error",
+            "rate limit", "payment required", "unauthorized", "forbidden"
+        ]
+
+        if httpErrorIndicators.contains(where: { lowercased.contains($0) }) {
+            return false
+        }
+
+        // These indicate LLM output parsing/validation errors
+        let validationKeywords = [
+            "failed to parse", "failed to coerce", "bamlvalidationerror",
+            "parse error", "invalid json", "missing required", "type mismatch",
+            "enum value", "unknown variant", "deserialize", "could not find"
+        ]
+        return validationKeywords.contains { lowercased.contains($0) }
+    }
+
+    /// Try to extract raw LLM output from an error message
+    private static func extractRawOutputFromMessage(_ message: String) -> String? {
+        let patterns = [
+            "LLM response:", "Raw text:", "Output:", "Got:",
+            "Failed to parse:", "failed to coerce:", "```", "received:"
+        ]
+
+        for pattern in patterns {
+            if let range = message.range(of: pattern, options: .caseInsensitive) {
+                let afterPattern = String(message[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !afterPattern.isEmpty {
+                    return afterPattern
+                }
+            }
+        }
+
+        if message.count > 200 && (message.contains("{") || message.contains("[")) {
+            return message
+        }
+
+        return nil
+    }
 }
 
 // MARK: - BAML FFI Runtime
@@ -188,6 +319,9 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
     /// Opaque pointer to the Rust runtime
     private let runtime: UnsafeMutableRawPointer
 
+    /// Environment variables passed to the runtime
+    public let envVars: [String: String]
+
     /// Create a runtime from embedded BAML source files
     /// - Parameters:
     ///   - rootPath: Root path for BAML files (used for relative imports)
@@ -195,6 +329,11 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
     ///   - envVars: Environment variables to pass to the runtime
     /// - Throws: BamlFFIError if runtime creation fails
     public init(rootPath: String, sourceFiles: [String: String], envVars: [String: String] = [:]) throws {
+        // Check if FFI is available
+        guard BamlFFI.isAvailable else {
+            throw BamlFFIError.libraryNotLoaded
+        }
+
         // Ensure callbacks are registered
         CallbackManager.shared.registerCallbacksIfNeeded()
 
@@ -223,20 +362,21 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
         let ptr = rootPath.withCString { root in
             srcString.withCString { src in
                 envString.withCString { env in
-                    baml_create_runtime(root, src, env)
+                    BamlFFI.createRuntime(rootPath: root, srcFilesJson: src, envVarsJson: env)
                 }
             }
         }
 
         guard let runtimePtr = ptr else {
-            throw BamlFFIError.runtimeCreationFailed("baml_create_runtime returned null")
+            throw BamlFFIError.runtimeCreationFailed("create_baml_runtime returned null")
         }
 
         self.runtime = runtimePtr
+        self.envVars = envVars
     }
 
     deinit {
-        baml_destroy_runtime(runtime)
+        BamlFFI.destroyRuntime(runtime)
     }
 
     /// Call a BAML function asynchronously
@@ -253,30 +393,29 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
 
             let buffer = name.withCString { namePtr in
                 args.withUnsafeBytes { argsPtr in
-                    baml_call_function(
-                        runtime,
-                        namePtr,
-                        argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
-                        args.count,
-                        callId
+                    BamlFFI.callFunction(
+                        runtime: runtime,
+                        functionName: namePtr,
+                        encodedArgs: argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
+                        length: args.count,
+                        callId: callId
                     )
                 }
             }
 
             // Check for immediate error in buffer
             if let data = buffer.toData() {
-                // Try to parse as error response
                 if let response = try? JSONDecoder().decode(FFIResponse.self, from: data) {
                     if let error = response.error {
                         CallbackManager.shared.removeCall(callId)
                         continuation.resume(throwing: BamlFFIError.functionCallFailed(error))
-                        baml_free_buffer(buffer)
+                        BamlFFI.freeBuffer(buffer)
                         return
                     }
                 }
             }
 
-            baml_free_buffer(buffer)
+            BamlFFI.freeBuffer(buffer)
         }
     }
 
@@ -297,12 +436,12 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
 
             let buffer = name.withCString { namePtr in
                 args.withUnsafeBytes { argsPtr in
-                    baml_call_function_stream(
-                        runtime,
-                        namePtr,
-                        argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
-                        args.count,
-                        callId
+                    BamlFFI.callFunctionStream(
+                        runtime: runtime,
+                        functionName: namePtr,
+                        encodedArgs: argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
+                        length: args.count,
+                        callId: callId
                     )
                 }
             }
@@ -317,7 +456,7 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
                 }
             }
 
-            baml_free_buffer(buffer)
+            BamlFFI.freeBuffer(buffer)
         }
     }
 
@@ -327,14 +466,14 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
     /// - Throws: BamlFFIError on failure
     public func callObjectMethod(_ args: Data) throws -> Data {
         let buffer = args.withUnsafeBytes { argsPtr in
-            baml_call_object_method(
-                runtime,
-                argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
-                args.count
+            BamlFFI.callObjectMethod(
+                runtime: runtime,
+                encodedArgs: argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
+                length: args.count
             )
         }
 
-        defer { baml_free_buffer(buffer) }
+        defer { BamlFFI.freeBuffer(buffer) }
 
         guard let data = buffer.toData() else {
             throw BamlFFIError.invalidResponse("Empty response from call_object_method")
@@ -349,51 +488,6 @@ public final class BamlRuntimeFFI: @unchecked Sendable {
 
         return data
     }
-
-    /// Get the output format JSON schema for a function
-    /// - Parameter functionName: Name of the function
-    /// - Returns: JSON schema string
-    /// - Throws: BamlFFIError on failure
-    public func getOutputFormat(_ functionName: String) throws -> String {
-        let buffer = functionName.withCString { namePtr in
-            baml_get_output_format(runtime, namePtr)
-        }
-
-        defer { baml_free_buffer(buffer) }
-
-        guard let schema = buffer.toString() else {
-            throw BamlFFIError.invalidResponse("Empty response from get_output_format")
-        }
-
-        return schema
-    }
-
-    /// Render a prompt template with arguments
-    /// - Parameters:
-    ///   - functionName: Name of the function
-    ///   - args: JSON-encoded arguments
-    /// - Returns: Rendered prompt string
-    /// - Throws: BamlFFIError on failure
-    public func renderPrompt(_ functionName: String, args: Data) throws -> String {
-        let buffer = functionName.withCString { namePtr in
-            args.withUnsafeBytes { argsPtr in
-                baml_render_prompt(
-                    runtime,
-                    namePtr,
-                    argsPtr.baseAddress!.assumingMemoryBound(to: Int8.self),
-                    args.count
-                )
-            }
-        }
-
-        defer { baml_free_buffer(buffer) }
-
-        guard let prompt = buffer.toString() else {
-            throw BamlFFIError.invalidResponse("Empty response from render_prompt")
-        }
-
-        return prompt
-    }
 }
 
 // MARK: - FFI Response
@@ -406,10 +500,7 @@ private struct FFIResponse: Decodable {
 
 /// Type-erased Codable for parsing unknown JSON structures
 private struct AnyCodable: Decodable {
-    init(from decoder: Decoder) throws {
-        // Just consume the value, we don't need to store it
+    init(from decoder: any Swift.Decoder) throws {
         _ = try decoder.singleValueContainer()
     }
 }
-
-#endif // BAML_FFI_ENABLED
