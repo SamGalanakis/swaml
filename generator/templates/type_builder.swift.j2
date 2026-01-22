@@ -15,8 +15,8 @@ import SWAML
 ///
 /// let result = try await client.selectTopMoments(..., typeBuilder: tb)
 /// ```
-public final class BamlTypeBuilder: TypeBuilder {
-    public override init() {
+public final class BamlTypeBuilder: TypeBuilder, @unchecked Sendable {
+    public init() {
         super.init(
             classes: Set([
 {% for c in classes %}
