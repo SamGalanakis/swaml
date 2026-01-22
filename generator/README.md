@@ -1,43 +1,41 @@
 # BAML Swift Generator
 
-A Rust-based code generator that converts [BAML](https://docs.boundaryml.com/) schema files into Swift code compatible with the [SWAML](https://github.com/SamGalanakis/swaml) runtime.
+Generate type-safe Swift code from [BAML](https://docs.boundaryml.com/) schema files for use with the [SWAML](https://github.com/SamGalanakis/swaml) runtime.
 
-## Overview
+## Quick Start: Using BAML with Swift Today
 
-This generator takes BAML definitions (classes, enums, functions) and produces type-safe Swift code with:
+BAML doesn't have native Swift support yet, but you can use it via the **OpenAPI approach**:
 
-- Structs with `Codable` conformance
-- Enums with raw values and `CaseIterable`
-- Async/await function signatures
-- Automatic `CodingKeys` for snake_case → camelCase mapping
-- Union types as Swift enums with associated values
-- Streaming partial types for incremental parsing
-
-## Installation
-
-### As a Rust Binary
+### 1. Install Prerequisites
 
 ```bash
-cd generator
-cargo build --release
+# Install Node.js (for BAML CLI)
+brew install node
+
+# Install Java (for OpenAPI generator)
+brew install openjdk
+
+# Install BAML VSCode extension for syntax highlighting
+# Search "BAML" in VSCode extensions
 ```
 
-### As a Library Dependency
+### 2. Initialize BAML Project
 
-```toml
-[dependencies]
-baml-generator-swift = { git = "https://github.com/SamGalanakis/swaml", branch = "main" }
+```bash
+# Create a new BAML project with OpenAPI/Swift support
+npx @boundaryml/baml init --client-type rest/openapi --openapi-client-type swift5
+
+# This creates:
+# - baml_src/ directory with your .baml files
+# - generators.baml with OpenAPI configuration
 ```
 
-## Usage
+### 3. Write Your BAML Schema
 
-### From BAML Files to Swift
-
-1. **Define your schema in `.baml` files:**
+Create `baml_src/main.baml`:
 
 ```baml
-// sentiment.baml
-
+// Define your types
 enum Sentiment {
     POSITIVE
     NEGATIVE
@@ -50,16 +48,79 @@ class SentimentResult {
     explanation string?
 }
 
+// Define your LLM function
 function ClassifySentiment(text: string) -> SentimentResult {
-    client default
+    client "openai/gpt-4o"
     prompt #"
-        Analyze the sentiment of: {{ text }}
-        Return JSON with sentiment, confidence (0-1), and explanation.
+        Analyze the sentiment of the following text and return JSON:
+
+        Text: {{ text }}
+
+        Return a JSON object with:
+        - sentiment: "POSITIVE", "NEGATIVE", or "NEUTRAL"
+        - confidence: a number between 0 and 1
+        - explanation: brief explanation of the sentiment
     "#
 }
 ```
 
-2. **Generate Swift code:**
+### 4. Start BAML Dev Server
+
+```bash
+# Start the BAML server (runs on localhost:2024)
+npx @boundaryml/baml dev --preview
+
+# This will:
+# - Parse your .baml files
+# - Start REST API server
+# - Generate baml_client/openapi.yaml
+# - Generate Swift client in baml_client/
+```
+
+### 5. Use Generated Swift Client
+
+```swift
+import Foundation
+
+// The OpenAPI generator creates these types for you
+let client = BamlAPI()
+
+// Call your BAML function
+let result = try await client.classifySentiment(text: "I love this product!")
+print(result.sentiment)     // .positive
+print(result.confidence)    // 0.95
+```
+
+### 6. Production Deployment
+
+For production, run the BAML server as a sidecar or separate service:
+
+```bash
+# Production mode
+npx @boundaryml/baml serve --port 2024
+```
+
+---
+
+## Alternative: Native Swift Generation (Advanced)
+
+This generator produces native Swift code directly from BAML's intermediate representation (IR), without requiring the REST server. This approach is useful for:
+
+- Embedding generated code directly in your Swift package
+- Avoiding network overhead of REST calls
+- Full control over the generated code
+
+### How It Works
+
+```
+.baml files → [BAML Parser] → BamlIR → [Swift Generator] → Swift code
+                    ↑                           ↑
+              (from BAML CLI)            (this crate)
+```
+
+**Note:** This generator takes `BamlIR` as input. The BAML parser is part of BAML's Rust crates (`internal-baml-core`). For now, you need to construct the IR programmatically or integrate with BAML's tooling.
+
+### Usage as Rust Library
 
 ```rust
 use baml_generator_swift::{
@@ -68,14 +129,13 @@ use baml_generator_swift::{
     FieldType,
 };
 
-// Build the IR from your BAML files (parser not included)
+// Construct IR (normally this comes from BAML's parser)
 let ir = BamlIR {
     enums: vec![EnumDef {
         name: "Sentiment".to_string(),
         values: vec![
             EnumValueDef { name: "POSITIVE".to_string(), alias: None, docstring: None },
             EnumValueDef { name: "NEGATIVE".to_string(), alias: None, docstring: None },
-            EnumValueDef { name: "NEUTRAL".to_string(), alias: None, docstring: None },
         ],
         docstring: None,
         dynamic: false,
@@ -83,20 +143,21 @@ let ir = BamlIR {
     classes: vec![ClassDef {
         name: "SentimentResult".to_string(),
         fields: vec![
-            FieldDef { name: "sentiment".to_string(), field_type: FieldType::Enum("Sentiment".to_string()), docstring: None },
-            FieldDef { name: "confidence".to_string(), field_type: FieldType::Float, docstring: None },
-            FieldDef { name: "explanation".to_string(), field_type: FieldType::Optional(Box::new(FieldType::String)), docstring: None },
+            FieldDef {
+                name: "sentiment".to_string(),
+                field_type: FieldType::Enum("Sentiment".to_string()),
+                docstring: None
+            },
+            FieldDef {
+                name: "confidence".to_string(),
+                field_type: FieldType::Float,
+                docstring: None
+            },
         ],
         docstring: None,
         has_dynamic_fields: false,
     }],
-    functions: vec![FunctionDef {
-        name: "ClassifySentiment".to_string(),
-        params: vec![ParamDef { name: "text".to_string(), param_type: FieldType::String, docstring: None }],
-        return_type: FieldType::Class("SentimentResult".to_string()),
-        docstring: None,
-        default_client: Some("default".to_string()),
-    }],
+    functions: vec![],
     type_aliases: vec![],
     clients: vec![],
 };
@@ -105,16 +166,32 @@ let ir = BamlIR {
 let generator = SwiftGenerator::with_defaults();
 let files = generator.generate(&ir)?;
 
-// Write files to disk
+// Write files
 for (path, content) in files.iter() {
     std::fs::write(path, content)?;
 }
 ```
 
-3. **Generated Swift code:**
+### Generated Output
 
+The generator produces:
+
+```
+baml_client/
+├── Types.swift       # Structs and enums
+├── BamlClient.swift  # Function signatures
+├── Globals.swift     # Client configuration
+├── Unions.swift      # Union types (if any)
+└── StreamTypes.swift # Streaming partials (if enabled)
+```
+
+**Types.swift:**
 ```swift
-// Types.swift
+// Generated by BAML - do not edit
+
+import Foundation
+import SWAML
+
 public enum Sentiment: String, Codable, Sendable, CaseIterable {
     case positive = "POSITIVE"
     case negative = "NEGATIVE"
@@ -126,78 +203,56 @@ public struct SentimentResult: Codable, Sendable, Equatable {
     public let confidence: Double
     public let explanation: String?
 }
-
-// BamlClient.swift
-public actor BamlClient {
-    private let runtime: BamlRuntime
-
-    public init(runtime: BamlRuntime) {
-        self.runtime = runtime
-    }
-
-    public func classifySentiment(text: String) async throws -> SentimentResult {
-        // Implementation using SWAML runtime
-    }
-}
 ```
 
-## Swift Project Integration
+---
 
-### 1. Add SWAML Dependency
+## Using Generated Code with SWAML Runtime
 
-In your `Package.swift`:
+Whether you use the OpenAPI approach or native generation, you can use the [SWAML runtime](https://github.com/SamGalanakis/swaml) for direct LLM calls:
+
+### Add SWAML to Your Project
 
 ```swift
+// Package.swift
 dependencies: [
     .package(url: "https://github.com/SamGalanakis/swaml", branch: "main"),
 ],
 targets: [
-    .target(
-        name: "YourApp",
-        dependencies: ["SWAML"]
-    ),
+    .target(name: "YourApp", dependencies: ["SWAML"]),
 ]
 ```
 
-### 2. Copy Generated Files
-
-Copy the generated `baml_client/` directory into your Swift project:
-
-```
-YourApp/
-├── Package.swift
-├── Sources/
-│   └── YourApp/
-│       ├── main.swift
-│       └── baml_client/          # Generated code
-│           ├── Types.swift
-│           ├── BamlClient.swift
-│           ├── Globals.swift
-│           └── Unions.swift      # If union types exist
-```
-
-### 3. Use the Generated Code
+### Direct LLM Calls with SWAML
 
 ```swift
 import SWAML
 
-// Configure the runtime
+// Configure runtime
 let runtime = await BamlRuntime.openRouter(
     apiKey: ProcessInfo.processInfo.environment["OPENROUTER_API_KEY"]!,
     model: "anthropic/claude-sonnet-4-20250514"
 )
 
-// Create the client
-let client = BamlClient(runtime: runtime)
+// Make request and parse response
+let response = try await runtime.complete(
+    messages: [
+        .system("Return JSON with sentiment, confidence, explanation"),
+        .user("Analyze: I love this product!")
+    ],
+    responseFormat: .jsonObject
+)
 
-// Call your BAML functions with full type safety
-let result = try await client.classifySentiment(text: "I love this product!")
-print(result.sentiment)      // .positive
-print(result.confidence)     // 0.95
-print(result.explanation)    // "The text expresses enthusiasm..."
+// Parse into your generated types
+let result: SentimentResult = try OutputParser.parse(
+    response.content,
+    type: SentimentResult.self
+)
 ```
 
-## Type Mapping
+---
+
+## Type Mapping Reference
 
 | BAML Type | Swift Type |
 |-----------|------------|
@@ -212,168 +267,35 @@ print(result.explanation)    // "The text expresses enthusiasm..."
 | `enum Bar` | `enum Bar: String, Codable, Sendable, CaseIterable` |
 | `A \| B \| C` | `enum AOrBOrC { case a(A), case b(B), case c(C) }` |
 
-## Generator Configuration
+---
 
-```rust
-let config = GeneratorConfig::builder()
-    .output_dir("Sources/Generated")
-    .package_name("MyBamlClient")
-    .generate_streaming(true)  // Generate partial types for streaming
-    .build();
+## Roadmap: Native BAML Integration
 
-let generator = SwiftGenerator::new(config);
-```
+The goal is to add Swift as a first-class BAML target language:
 
-## Complex Example: E-commerce
+1. **Current state**: OpenAPI works, native generator needs BAML parser integration
+2. **Next step**: Integrate with `internal-baml-core` to parse `.baml` files directly
+3. **Future**: Contribute Swift generator upstream to BAML repository
 
-BAML schema:
+### Contributing to BAML
 
-```baml
-enum OrderStatus {
-    PENDING
-    PROCESSING
-    SHIPPED
-    DELIVERED
-}
+To add native Swift support to BAML itself, you would:
 
-class Money {
-    amount float
-    currency string
-}
+1. Fork [BoundaryML/baml](https://github.com/BoundaryML/baml)
+2. Add `language_client_swift/` following the pattern of `language_client_go/`
+3. Integrate this generator's logic
+4. Submit PR
 
-class OrderItem {
-    product_id string
-    quantity int
-    unit_price Money
-}
-
-class Order {
-    order_id string
-    items OrderItem[]
-    status OrderStatus
-    shipping_address string
-    total Money
-    notes string?
-    metadata map<string, string>
-}
-
-function CreateOrder(
-    customer_id: string,
-    items: OrderItem[],
-    shipping_address: string
-) -> Order {
-    client default
-    prompt #"Create order for customer {{ customer_id }}"#
-}
-```
-
-Generated Swift:
-
-```swift
-public enum OrderStatus: String, Codable, Sendable, CaseIterable {
-    case pending = "PENDING"
-    case processing = "PROCESSING"
-    case shipped = "SHIPPED"
-    case delivered = "DELIVERED"
-}
-
-public struct Money: Codable, Sendable, Equatable {
-    public let amount: Double
-    public let currency: String
-}
-
-public struct OrderItem: Codable, Sendable, Equatable {
-    public let productId: String
-    public let quantity: Int
-    public let unitPrice: Money
-
-    enum CodingKeys: String, CodingKey {
-        case productId = "product_id"
-        case quantity
-        case unitPrice = "unit_price"
-    }
-}
-
-public struct Order: Codable, Sendable, Equatable {
-    public let orderId: String
-    public let items: [OrderItem]
-    public let status: OrderStatus
-    public let shippingAddress: String
-    public let total: Money
-    public let notes: String?
-    public let metadata: [String: String]
-
-    enum CodingKeys: String, CodingKey {
-        case orderId = "order_id"
-        case items, status
-        case shippingAddress = "shipping_address"
-        case total, notes, metadata
-    }
-}
-```
-
-## Union Types
-
-BAML union types become Swift enums with associated values:
-
-```baml
-class TextContent {
-    body string
-}
-
-class ImageContent {
-    url string
-    alt_text string?
-}
-
-class ContentItem {
-    id string
-    content TextContent | ImageContent
-}
-```
-
-Generated:
-
-```swift
-public enum TextContentOrImageContent: Codable, Sendable, Equatable {
-    case textContent(TextContent)
-    case imageContent(ImageContent)
-
-    public init(from decoder: Decoder) throws {
-        if let value = try? TextContent(from: decoder) {
-            self = .textContent(value)
-            return
-        }
-        if let value = try? ImageContent(from: decoder) {
-            self = .imageContent(value)
-            return
-        }
-        throw DecodingError.typeMismatch(/* ... */)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        switch self {
-        case .textContent(let value): try value.encode(to: encoder)
-        case .imageContent(let value): try value.encode(to: encoder)
-        }
-    }
-}
-```
-
-## Streaming Support
-
-When `generate_streaming` is enabled, partial types are generated for incremental parsing:
-
-```swift
-// All fields become optional for partial parsing
-public struct SentimentResultPartial: Codable, Sendable {
-    public let sentiment: Sentiment?
-    public let confidence: Double?
-    public let explanation: String?
-}
-```
+---
 
 ## Development
+
+### Building
+
+```bash
+cd generator
+cargo build --release
+```
 
 ### Running Tests
 
@@ -383,11 +305,20 @@ cargo test
 
 ### Test Fixtures
 
-Example BAML files are in `tests/fixtures/`:
+Example BAML schemas in `tests/fixtures/`:
 - `sentiment.baml` - Basic enum and class
 - `user_profile.baml` - Complex nested types with maps
 - `content_types.baml` - Union types
 - `ecommerce.baml` - Real-world e-commerce schema
+
+---
+
+## Resources
+
+- [BAML Documentation](https://docs.boundaryml.com/)
+- [BAML REST API Guide](https://docs.boundaryml.com/guide/installation-language/rest-api-other-languages)
+- [SWAML Runtime](https://github.com/SamGalanakis/swaml)
+- [OpenAPI Generator](https://openapi-generator.tech/)
 
 ## License
 
