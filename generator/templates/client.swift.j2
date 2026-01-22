@@ -39,41 +39,10 @@ public actor BamlAsyncClient {
 {% if func.prompt.is_some() %}
             prompt: prompt,
 {% endif %}
-            returnType: {{ func.return_type_string() }}.self
+            outputType: {{ func.return_type_string() }}.self
         )
     }
-{% if func.stream_return_type.is_some() %}
-
-{% if func.docstring.is_some() %}
-    /// {{ func.docstring.as_ref().unwrap() }} (streaming)
-{% endif %}
-    public func {{ func.name }}Stream(
-{% for param in func.params %}
-        {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %}{% if !loop.last %},{% endif %}
-
-{% endfor %}
-    ) -> AsyncThrowingStream<{{ func.stream_return_type_string().unwrap() }}, Error> {
-        let args: [String: BamlValue] = [
-{% for param in func.params %}
-            "{{ param.baml_name }}": try BamlValue.from({{ param.name }}){% if !loop.last %},{% endif %}
-
-{% endfor %}
-        ]
-{% if func.prompt.is_some() %}
-
-        let prompt = {{ func.prompt_literal().unwrap() }}
-{% endif %}
-
-        return runtime.streamFunction(
-            "{{ func.baml_name }}",
-            args: args,
-{% if func.prompt.is_some() %}
-            prompt: prompt,
-{% endif %}
-            partialType: {{ func.stream_return_type_string().unwrap() }}.self
-        )
-    }
-{% endif %}
+{# Streaming not yet supported in SWAML runtime #}
 {% endfor %}
 }
 

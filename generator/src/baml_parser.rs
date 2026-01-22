@@ -112,8 +112,8 @@ fn convert_enum(node: &Node<Enum>) -> Result<EnumDef> {
         .values
         .iter()
         .map(|(value_node, docstring)| {
-            // Try to get alias from attributes - convert to string representation
-            let alias = value_node.attributes.alias().map(|s| format!("{:?}", s));
+            // Try to get alias from attributes - convert to string
+            let alias = value_node.attributes.alias().map(|s| s.to_string());
             EnumValueDef {
                 name: value_node.elem.0.clone(),
                 alias,
@@ -214,9 +214,17 @@ fn convert_client(
 ) -> Result<ClientConfigSwift> {
     let client = &node.elem;
 
+    // Extract provider name from debug string (e.g., "OpenAI(Generic)" -> "openai")
+    let provider_debug = format!("{:?}", client.provider);
+    let provider = provider_debug
+        .split('(')
+        .next()
+        .unwrap_or(&provider_debug)
+        .to_lowercase();
+
     Ok(ClientConfigSwift {
         name: client.name.clone(),
-        provider: format!("{:?}", client.provider),
+        provider,
         model: String::new(), // Model is configured elsewhere in BAML
         options: indexmap::IndexMap::new(),
     })
