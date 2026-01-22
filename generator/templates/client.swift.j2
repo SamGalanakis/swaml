@@ -28,10 +28,17 @@ public actor BamlAsyncClient {
 
 {% endfor %}
         ]
+{% if func.prompt.is_some() %}
+
+        let prompt = {{ func.prompt_literal().unwrap() }}
+{% endif %}
 
         return try await runtime.callFunction(
             "{{ func.baml_name }}",
             args: args,
+{% if func.prompt.is_some() %}
+            prompt: prompt,
+{% endif %}
             returnType: {{ func.return_type_string() }}.self
         )
     }
@@ -52,10 +59,17 @@ public actor BamlAsyncClient {
 
 {% endfor %}
         ]
+{% if func.prompt.is_some() %}
+
+        let prompt = {{ func.prompt_literal().unwrap() }}
+{% endif %}
 
         return runtime.streamFunction(
             "{{ func.baml_name }}",
             args: args,
+{% if func.prompt.is_some() %}
+            prompt: prompt,
+{% endif %}
             partialType: {{ func.stream_return_type_string().unwrap() }}.self
         )
     }

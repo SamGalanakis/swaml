@@ -469,6 +469,7 @@ mod tests {
                 }],
                 return_type: FieldType::Enum("Sentiment".to_string()),
                 default_client: None,
+                prompt: Some("Classify the sentiment: {{ text }}".to_string()),
             }],
             enums: vec![EnumDef {
                 name: "Sentiment".to_string(),

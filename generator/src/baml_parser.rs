@@ -175,11 +175,17 @@ fn convert_function(node: &Node<Function>) -> Result<FunctionDef> {
         })
         .collect::<Result<Vec<_>>>()?;
 
+    // Get the default config
+    let default_config = func.default_config();
+
     // Get the default client name from configs
-    let default_client = func.default_config().map(|config| {
+    let default_client = default_config.map(|config| {
         // ClientSpec to string
         format!("{:?}", config.client)
     });
+
+    // Get the prompt template from the default config
+    let prompt = default_config.map(|config| config.prompt_template.clone());
 
     Ok(FunctionDef {
         name: func.name.clone(),
@@ -187,6 +193,7 @@ fn convert_function(node: &Node<Function>) -> Result<FunctionDef> {
         params,
         return_type: convert_type(&func.output)?,
         default_client,
+        prompt,
     })
 }
 

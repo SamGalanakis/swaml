@@ -22,6 +22,8 @@ pub struct FunctionDef {
     pub return_type: FieldType,
     /// Default client to use
     pub default_client: Option<String>,
+    /// The prompt template
+    pub prompt: Option<String>,
 }
 
 /// Simplified parameter definition
@@ -67,6 +69,7 @@ pub fn function_def_to_swift(func: &FunctionDef, ctx: &GenerationContext) -> Fun
         return_type,
         stream_return_type,
         client: func.default_client.clone(),
+        prompt: func.prompt.clone(),
     }
 }
 
@@ -135,6 +138,7 @@ mod tests {
             }],
             return_type: FieldType::Enum("Sentiment".to_string()),
             default_client: Some("default".to_string()),
+            prompt: Some("Classify the sentiment of: {{ user_input }}".to_string()),
         };
 
         let swift_func = function_def_to_swift(&func, &ctx);

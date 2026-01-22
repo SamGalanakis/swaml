@@ -164,6 +164,8 @@ pub struct FunctionSwift {
     pub stream_return_type: Option<TypeSwift>,
     /// The client to use for this function
     pub client: Option<String>,
+    /// The prompt template
+    pub prompt: Option<String>,
 }
 
 impl FunctionSwift {
@@ -189,6 +191,17 @@ impl FunctionSwift {
             .map(|p| p.signature())
             .collect::<Vec<_>>()
             .join(",\n        ")
+    }
+
+    /// Get the prompt as a Swift multiline string literal
+    pub fn prompt_literal(&self) -> Option<String> {
+        self.prompt.as_ref().map(|p| {
+            // Escape for Swift multiline string
+            let escaped = p
+                .replace("\\", "\\\\")
+                .replace("\"\"\"", "\\\"\\\"\\\"");
+            format!("\"\"\"\n{}\n\"\"\"", escaped)
+        })
     }
 }
 

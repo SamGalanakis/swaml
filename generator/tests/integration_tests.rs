@@ -72,6 +72,7 @@ fn sentiment_ir() -> BamlIR {
             }],
             return_type: FieldType::Class("SentimentResult".to_string()),
             default_client: Some("default".to_string()),
+            prompt: Some("Classify the sentiment of: {{ text }}".to_string()),
         }],
         type_aliases: vec![],
         clients: vec![ClientConfigSwift {
@@ -261,6 +262,7 @@ fn user_profile_ir() -> BamlIR {
                 ],
                 return_type: FieldType::Class("UserProfile".to_string()),
                 default_client: None,
+                prompt: None,
             },
             FunctionDef {
                 name: "GetUsersByStatus".to_string(),
@@ -272,6 +274,7 @@ fn user_profile_ir() -> BamlIR {
                 }],
                 return_type: FieldType::List(Box::new(FieldType::Class("UserProfile".to_string()))),
                 default_client: None,
+                prompt: None,
             },
         ],
         type_aliases: vec![],
@@ -454,6 +457,7 @@ fn content_types_ir() -> BamlIR {
                 }],
                 return_type: FieldType::String,
                 default_client: None,
+                prompt: None,
             },
             FunctionDef {
                 name: "GetContentFeed".to_string(),
@@ -472,6 +476,7 @@ fn content_types_ir() -> BamlIR {
                 ],
                 return_type: FieldType::Class("ContentFeed".to_string()),
                 default_client: None,
+                prompt: None,
             },
         ],
         type_aliases: vec![],
@@ -728,6 +733,7 @@ fn ecommerce_ir() -> BamlIR {
             }],
             return_type: FieldType::Class("Money".to_string()),
             default_client: None,
+            prompt: None,
         }],
         type_aliases: vec![],
         clients: vec![],
