@@ -20,6 +20,7 @@ baml-types.workspace = true
 baml-runtime = { path = "../baml-runtime", default-features = false, features = [
   "internal",
   "ffi-only",
+  # "bedrock",  # Uncomment to enable AWS Bedrock support (~5-8MB larger binary)
 ] }
 internal-baml-core.workspace = true
 serde.workspace = true

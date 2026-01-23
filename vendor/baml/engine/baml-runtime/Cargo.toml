@@ -103,15 +103,16 @@ include_dir = "0.7.3"
 infer = "0.16.0"
 url = "2.5.2"
 shell-escape = "0.1.5"
-aws-sigv4 = "1.2.2"
-aws-credential-types = "1.2.1"
-aws-runtime = "1.5.5"
-aws-smithy-async = "1.2.1"
-aws-smithy-runtime-api = "1.7.0"
-aws-smithy-types = "1.2.0"
-aws-smithy-runtime = "1.6.0"
+# AWS SDK - optional, only needed for Bedrock support
+aws-sigv4 = { version = "1.2.2", optional = true }
+aws-credential-types = { version = "1.2.1", optional = true }
+aws-runtime = { version = "1.5.5", optional = true }
+aws-smithy-async = { version = "1.2.1", optional = true }
+aws-smithy-runtime-api = { version = "1.7.0", optional = true }
+aws-smithy-types = { version = "1.2.0", optional = true }
+aws-smithy-runtime = { version = "1.6.0", optional = true }
+aws-smithy-json = { version = "0.60.7", optional = true }
 enum_dispatch = "0.3.13"
-aws-smithy-json = "0.60.7"
 pretty_assertions = "1.4.0"
 valuable = { version = "0.1.0", features = ["derive"] }
 tracing = { version = "0.1.40", features = ["valuable"] }
@@ -133,15 +134,15 @@ similar = "2.6"
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-aws-config = { version = "=1.5.3", default-features = false, features = [] }
+# AWS SDK for Bedrock - optional
 # You will run into some crypto/install issues with vertex tests if you move further than this due to https://github.com/awslabs/aws-sdk-rust/releases/tag/release-2025-03-11 . The new version uses aws_lc_rs instead of ring.
 # but depending on ring and aws_lc_rs leads to issues.
 # https://github.com/rustls/rustls/issues/1877
 # https://github.com/awslabs/aws-sdk-rust/issues/1263
 # same goes for aws-config.
 # Potential migration https://docs.aws.amazon.com/sdk-for-rust/latest/dg/http.html#tlsProviders
-aws-sdk-bedrockruntime = { version = "=1.106.0", default-features = false, features = [
-] }
+aws-config = { version = "=1.5.3", default-features = false, features = [], optional = true }
+aws-sdk-bedrockruntime = { version = "=1.106.0", default-features = false, features = [], optional = true }
 colored = { version = "2.1.0", default-features = false, features = [
   "no-color",
 ] }
@@ -171,8 +172,9 @@ tokio = { version = "1", features = ["rt", "sync"] }
 
 # Dependencies for all non-wasm targets (including iOS)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-aws-config = "=1.5.3"
-aws-sdk-bedrockruntime = { version = "=1.106.0", default-features = false, features = [] }
+# AWS SDK for Bedrock - optional
+aws-config = { version = "=1.5.3", optional = true }
+aws-sdk-bedrockruntime = { version = "=1.106.0", default-features = false, features = [], optional = true }
 hostname = "0.3.1"
 jsonwebtoken = { version = "9.3.0" }
 ring = { version = "0.17.4", features = ["std"] }
@@ -200,7 +202,7 @@ reedline = "0.37"
 
 
 [features]
-defaults = ["skip-integ-tests", "sdk-generation"]
+defaults = ["skip-integ-tests", "sdk-generation", "bedrock"]
 internal = []
 skip-integ-tests = []
 # Use the THIR interpreter runtime instead of the VM bytecode runtime
@@ -210,6 +212,20 @@ thir-interpreter = []
 sdk-generation = ["generators-lib", "generators-openapi"]
 # FFI-only mode - minimal runtime for FFI calls, no SDK generation
 ffi-only = []
+# AWS Bedrock support - adds ~5-8MB to binary size
+# Disable this if you don't need AWS Bedrock LLM provider
+bedrock = [
+    "aws-sigv4",
+    "aws-credential-types",
+    "aws-runtime",
+    "aws-smithy-async",
+    "aws-smithy-runtime-api",
+    "aws-smithy-types",
+    "aws-smithy-runtime",
+    "aws-smithy-json",
+    "aws-config",
+    "aws-sdk-bedrockruntime",
+]
 
 
 [dev-dependencies]

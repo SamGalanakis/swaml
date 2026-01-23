@@ -8,9 +8,11 @@ use internal_llm_client::{AllowedRoleMetadata, ClientProvider, OpenAIClientProvi
 
 pub(crate) use self::request::{json_body, json_headers, JsonBodyInput};
 use self::{
-    anthropic::AnthropicClient, aws::AwsClient, google::GoogleAIClient, openai::OpenAIClient,
+    anthropic::AnthropicClient, google::GoogleAIClient, openai::OpenAIClient,
     request::RequestBuilder, vertex::VertexClient,
 };
+#[cfg(feature = "bedrock")]
+use self::aws::AwsClient;
 use super::{
     orchestrator::{
         ExecutionScope, IterOrchestrator, OrchestrationScope, OrchestrationState, OrchestratorNode,
@@ -28,6 +30,7 @@ use crate::{
 };
 
 mod anthropic;
+#[cfg(feature = "bedrock")]
 mod aws;
 mod google;
 mod openai;
@@ -43,6 +46,7 @@ pub enum LLMPrimitive2 {
     AnthropicClient,
     GoogleAIClient,
     VertexClient,
+    #[cfg(feature = "bedrock")]
     AwsClient,
 }
 
@@ -54,6 +58,7 @@ pub enum LLMPrimitiveProvider {
     Anthropic(AnthropicClient),
     Google(GoogleAIClient),
     Vertex(VertexClient),
+    #[cfg(feature = "bedrock")]
     Aws(aws::AwsClient),
 }
 
@@ -64,6 +69,7 @@ macro_rules! match_llm_provider {
             LLMPrimitiveProvider::OpenAI(client) => client.$method($($args),*).await,
             LLMPrimitiveProvider::Anthropic(client) => client.$method($($args),*).await,
             LLMPrimitiveProvider::Google(client) => client.$method($($args),*).await,
+            #[cfg(feature = "bedrock")]
             LLMPrimitiveProvider::Aws(client) => client.$method($($args),*).await,
             LLMPrimitiveProvider::Vertex(client) => client.$method($($args),*).await,
         }
@@ -74,6 +80,7 @@ macro_rules! match_llm_provider {
             LLMPrimitiveProvider::OpenAI(client) => client.$method($($args),*),
             LLMPrimitiveProvider::Anthropic(client) => client.$method($($args),*),
             LLMPrimitiveProvider::Google(client) => client.$method($($args),*),
+            #[cfg(feature = "bedrock")]
             LLMPrimitiveProvider::Aws(client) => client.$method($($args),*),
             LLMPrimitiveProvider::Vertex(client) => client.$method($($args),*),
         }
@@ -132,7 +139,10 @@ impl TryFrom<(&ClientProperty, &RuntimeContext)> for LLMPrimitiveProvider {
                 }
             }
             ClientProvider::Anthropic => AnthropicClient::dynamic_new(value, ctx).map(Into::into),
+            #[cfg(feature = "bedrock")]
             ClientProvider::AwsBedrock => AwsClient::dynamic_new(value, ctx).map(Into::into),
+            #[cfg(not(feature = "bedrock"))]
+            ClientProvider::AwsBedrock => anyhow::bail!("AWS Bedrock support is not enabled. Rebuild with the 'bedrock' feature."),
             ClientProvider::GoogleAi => GoogleAIClient::dynamic_new(value, ctx).map(Into::into),
             ClientProvider::Vertex => VertexClient::dynamic_new(value, ctx).map(Into::into),
             ClientProvider::Strategy(strategy_client_provider) => {
@@ -196,7 +206,10 @@ impl TryFrom<(&ClientWalker<'_>, &RuntimeContext)> for LLMPrimitiveProvider {
                 }
             }
             ClientProvider::Anthropic => AnthropicClient::new(client, ctx).map(Into::into),
+            #[cfg(feature = "bedrock")]
             ClientProvider::AwsBedrock => AwsClient::new(client, ctx).map(Into::into),
+            #[cfg(not(feature = "bedrock"))]
+            ClientProvider::AwsBedrock => anyhow::bail!("AWS Bedrock support is not enabled. Rebuild with the 'bedrock' feature."),
             ClientProvider::GoogleAi => GoogleAIClient::new(client, ctx).map(Into::into),
             ClientProvider::Vertex => VertexClient::new(client, ctx).map(Into::into),
             ClientProvider::Strategy(strategy_client_provider) => {
@@ -220,7 +233,8 @@ impl LLMPrimitiveProvider {
             LLMPrimitiveProvider::Anthropic(client) => client.chat_to_message(chat),
             LLMPrimitiveProvider::Google(client) => client.chat_to_message(chat),
             LLMPrimitiveProvider::Vertex(client) => client.chat_to_message(chat),
-            LLMPrimitiveProvider::Aws(client) => {
+            #[cfg(feature = "bedrock")]
+            LLMPrimitiveProvider::Aws(_client) => {
                 anyhow::bail!("Prompt exposure for AWS client is not supported")
             }
         }
@@ -235,7 +249,8 @@ impl LLMPrimitiveProvider {
             LLMPrimitiveProvider::Anthropic(client) => client.completion_to_provider_body(prompt),
             LLMPrimitiveProvider::Google(client) => client.completion_to_provider_body(prompt),
             LLMPrimitiveProvider::Vertex(client) => client.completion_to_provider_body(prompt),
-            LLMPrimitiveProvider::Aws(client) => {
+            #[cfg(feature = "bedrock")]
+            LLMPrimitiveProvider::Aws(_client) => {
                 anyhow::bail!("Prompt exposure for AWS client is not supported")
             }
         })
@@ -268,7 +283,8 @@ impl LLMPrimitiveProvider {
                     .build_request(prompt, allow_proxy, stream, true)
                     .await
             }
-            LLMPrimitiveProvider::Aws(client) => {
+            #[cfg(feature = "bedrock")]
+            LLMPrimitiveProvider::Aws(_client) => {
                 anyhow::bail!("Prompt exposure for AWS client is not supported")
             }
         }
@@ -339,6 +355,7 @@ impl std::fmt::Display for LLMPrimitiveProvider {
             LLMPrimitiveProvider::OpenAI(_) => write!(f, "OpenAI"),
             LLMPrimitiveProvider::Anthropic(_) => write!(f, "Anthropic"),
             LLMPrimitiveProvider::Google(_) => write!(f, "Google"),
+            #[cfg(feature = "bedrock")]
             LLMPrimitiveProvider::Aws(_) => write!(f, "AWS"),
             LLMPrimitiveProvider::Vertex(_) => write!(f, "Vertex"),
         }
@@ -364,6 +381,7 @@ impl LLMPrimitiveProvider {
             LLMPrimitiveProvider::Anthropic(client) => client.http_config(),
             LLMPrimitiveProvider::Google(client) => client.http_config(),
             LLMPrimitiveProvider::Vertex(client) => client.http_config(),
+            #[cfg(feature = "bedrock")]
             LLMPrimitiveProvider::Aws(client) => client.http_config(),
         }
     }
