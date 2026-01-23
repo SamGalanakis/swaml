@@ -72,6 +72,12 @@ fastlane/test_output
 target/
 Cargo.lock
 
+# Vendored BAML build artifacts
+vendor/baml/engine/target/
+
+# Built libraries
+lib/
+
 # Swift Package Manager
 .swiftpm/
 Package.resolved

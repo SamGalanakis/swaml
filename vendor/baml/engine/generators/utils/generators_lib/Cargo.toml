@@ -1,0 +1,20 @@
+[package]
+edition = "2021"
+name = "generators-lib"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+license-file.workspace = true
+
+# MODIFIED for SWAML: Removed all language generators except openapi
+# The runtime only needs openapi for its internal operations
+
+[dependencies]
+anyhow.workspace = true
+baml-log.workspace = true
+serde_json.workspace = true
+dir-writer = { path = "../dir_writer" }
+generators-openapi = { path = "../../languages/openapi" }
+internal-baml-core.workspace = true
+indexmap.workspace = true
+semver.workspace = true
