@@ -6,7 +6,7 @@ A pure Swift library for building LLM applications with type-safe structured out
 
 - **Pure Swift** - No Rust, no FFI, no external binaries
 - **Type-safe LLM calls** - Define Swift types, get typed responses
-- **BAML-compatible output format** - Uses BAML's proven prompt format for structured outputs
+- **Proven output format** - Uses a proven prompt format for structured outputs
 - **Robust JSON parsing** - Handles trailing commas, comments, unquoted keys, markdown code blocks
 - **Dynamic types** - Build schemas at runtime with TypeBuilder
 - **Multiple providers** - OpenRouter, OpenAI, Anthropic, or custom endpoints
@@ -34,7 +34,7 @@ import SWAML
 import SwamlMacros
 
 // Define your response type
-@BamlType
+@SwamlType
 struct Sentiment {
     @Description("The detected sentiment")
     let sentiment: String
@@ -63,7 +63,7 @@ print(result.reasons)      // ["Expresses love", "Enthusiastic tone"]
 
 ## How It Works
 
-SWAML automatically generates BAML-style prompts that instruct the LLM how to format its response:
+SWAML automatically generates schema prompts that instruct the LLM how to format its response:
 
 ```
 Answer in JSON using this schema:
@@ -159,12 +159,12 @@ let parsed = try JsonishParser.parse(json5)
 
 ## Swift Macros
 
-### @BamlType
+### @SwamlType
 
 Generates schema conformance:
 
 ```swift
-@BamlType
+@SwamlType
 struct User {
     let name: String
     let age: Int
@@ -177,7 +177,7 @@ struct User {
 Add descriptions (included in LLM prompts):
 
 ```swift
-@BamlType
+@SwamlType
 struct Order {
     @Description("Unique order identifier")
     let orderId: String
@@ -187,13 +187,13 @@ struct Order {
 }
 ```
 
-### @BamlDynamic
+### @SwamlDynamic
 
 Mark types as extensible at runtime:
 
 ```swift
-@BamlType
-@BamlDynamic
+@SwamlType
+@SwamlDynamic
 enum Category: String {
     case electronics
     case clothing
@@ -242,6 +242,17 @@ try client.extendEnum(Category.self, with: ["furniture", "books"])
 | `[T]` | `T[]` |
 | `T?` | `T \| null` |
 | `[String: T]` | `map<string, T>` |
+
+## Documentation
+
+See the [docs/](docs/) folder for comprehensive documentation:
+
+- [Getting Started](docs/getting-started.md)
+- [Core Concepts](docs/core-concepts.md)
+- [API Reference](docs/api-reference.md)
+- [TypeBuilder](docs/type-builder.md)
+- [Providers](docs/providers.md)
+- [Advanced Usage](docs/advanced-usage.md)
 
 ## Requirements
 
