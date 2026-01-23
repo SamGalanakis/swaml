@@ -4,7 +4,7 @@
 import Foundation
 import SWAML
 
-/// Options for BAML function calls
+/// Options for BAML function calls (pure Swift runtime)
 public struct BamlCallOptions: Sendable {
     /// TypeBuilder for dynamic enum values
     public let typeBuilder: TypeBuilder?
@@ -33,6 +33,42 @@ public struct BamlCallOptions: Sendable {
 
 #if BAML_FFI_ENABLED
 
+/// Options for BAML FFI function calls
+public struct BamlCallOptionsFFI: Sendable {
+    /// TypeBuilder FFI handle for dynamic enum values
+    public let typeBuilder: TypeBuilderFFI?
+
+    /// Client name override
+    public let clientName: String?
+
+    /// Additional tags for tracing
+    public let tags: [String: String]
+
+    public init(
+        typeBuilder: TypeBuilderFFI? = nil,
+        clientName: String? = nil,
+        tags: [String: String] = [:]
+    ) {
+        self.typeBuilder = typeBuilder
+        self.clientName = clientName
+        self.tags = tags
+    }
+
+    /// Create options with just a TypeBuilder FFI
+    public static func with(typeBuilder: TypeBuilderFFI) -> BamlCallOptionsFFI {
+        BamlCallOptionsFFI(typeBuilder: typeBuilder)
+    }
+
+    /// Create options with just a client name
+    public static func with(clientName: String) -> BamlCallOptionsFFI {
+        BamlCallOptionsFFI(clientName: clientName)
+    }
+}
+
+#endif // BAML_FFI_ENABLED
+
+#if BAML_FFI_ENABLED
+
 // MARK: - FFI-Based Client (uses BAML Rust runtime)
 
 /// Async BAML client using the FFI runtime (BAML Rust backend)
@@ -51,24 +87,28 @@ public actor BamlAsyncClientFFI {
 {% for param in func.params %}
         {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
 {% endfor %}
-        options: BamlCallOptions? = nil
+        options: BamlCallOptionsFFI? = nil
     ) async throws -> {{ func.return_type_string() }} {
-        // Build arguments dictionary
-        var argsDict: [String: Any] = [:]
+        // Build protobuf arguments
+        var kwargs: [HostMapEntry] = []
 {% for param in func.params %}
-        argsDict["{{ param.baml_name }}"] = {{ param.name }}
+        kwargs.append(HostMapEntry(stringKey: "{{ param.baml_name }}", value: try HostValue.from({{ param.name }})))
 {% endfor %}
 
-        // Add TypeBuilder serialization if present
+        var arguments = HostFunctionArguments(kwargs: kwargs)
+
+        // Add TypeBuilder handle if present
         if let tb = options?.typeBuilder {
-            argsDict["__type_builder__"] = tb.toSerializable()
+            arguments.typeBuilder = tb.toBamlObjectHandle()
         }
 
-        // Encode arguments as JSON
-        let argsData = try JSONSerialization.data(withJSONObject: argsDict)
+        // Add tags if present
+        if let tags = options?.tags, !tags.isEmpty {
+            arguments.tags = tags.map { HostMapEntry(stringKey: $0.key, value: .string($0.value)) }
+        }
 
-        // Call FFI runtime
-        let resultData = try await runtime.callFunction("{{ func.baml_name }}", args: argsData)
+        // Call FFI runtime with protobuf encoding
+        let resultData = try await runtime.callFunctionProto("{{ func.baml_name }}", arguments: arguments)
 
         // Decode result
         return try JSONDecoder().decode({{ func.return_type_string() }}.self, from: resultData)
@@ -79,23 +119,26 @@ public actor BamlAsyncClientFFI {
 {% for param in func.params %}
         {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
 {% endfor %}
-        options: BamlCallOptions? = nil
+        options: BamlCallOptionsFFI? = nil
     ) -> AsyncThrowingStream<Partial{{ func.return_type_string() }}, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    // Build arguments dictionary
-                    var argsDict: [String: Any] = [:]
+                    // Build protobuf arguments
+                    var kwargs: [HostMapEntry] = []
 {% for param in func.params %}
-                    argsDict["{{ param.baml_name }}"] = {{ param.name }}
+                    kwargs.append(HostMapEntry(stringKey: "{{ param.baml_name }}", value: try HostValue.from({{ param.name }})))
 {% endfor %}
 
-                    // Add TypeBuilder serialization if present
+                    var arguments = HostFunctionArguments(kwargs: kwargs)
+
+                    // Add TypeBuilder handle if present
                     if let tb = options?.typeBuilder {
-                        argsDict["__type_builder__"] = tb.toSerializable()
+                        arguments.typeBuilder = tb.toBamlObjectHandle()
                     }
 
-                    let argsData = try JSONSerialization.data(withJSONObject: argsDict)
+                    // Encode as protobuf
+                    let argsData = try arguments.serializedData()
 
                     for try await chunk in runtime.callFunctionStream("{{ func.baml_name }}", args: argsData) {
                         if let partial = try? JSONDecoder().decode(Partial{{ func.return_type_string() }}.self, from: chunk) {
@@ -224,7 +267,7 @@ public final class BamlSyncClientFFI: @unchecked Sendable {
 {% for param in func.params %}
         {{ param.name }}: {{ param.type_string() }}{% if param.has_default() %} = {{ param.default_value.as_ref().unwrap() }}{% endif %},
 {% endfor %}
-        options: BamlCallOptions? = nil
+        options: BamlCallOptionsFFI? = nil
     ) throws -> {{ func.return_type_string() }} {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<{{ func.return_type_string() }}, Error>!

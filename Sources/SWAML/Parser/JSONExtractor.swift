@@ -144,7 +144,6 @@ public struct JSONExtractor {
 
         // Remove trailing commas before } (with optional whitespace)
         while let range = result.range(of: ",\\s*\\}", options: .regularExpression) {
-            let whitespaceCount = result.distance(from: range.lowerBound, to: range.upperBound) - 2
             result.replaceSubrange(range, with: "}")
         }
 
@@ -185,7 +184,7 @@ public struct JSONExtractor {
 
     private static func fixSingleQuotes(_ json: String) -> String {
         // This is a simplified fix - in production, need to handle escaped quotes
-        var result = json
+        let result = json
         var inDoubleQuoteString = false
         var newString = ""
         var prevChar: Character?

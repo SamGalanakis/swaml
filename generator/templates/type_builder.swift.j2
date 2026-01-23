@@ -101,3 +101,32 @@ extension BamlTypeBuilder {
         return tb
     }
 }
+
+#if BAML_FFI_ENABLED
+
+extension BamlTypeBuilder {
+    /// Create a TypeBuilderFFI populated with all values from this TypeBuilder.
+    /// Use this when calling FFI functions that need dynamic enum constraints.
+    ///
+    /// Example:
+    /// ```swift
+    /// let tb = BamlTypeBuilder()
+    /// tb.MomentId.addValue("moment_123")
+    ///
+    /// let tbFFI = try tb.toFFI()
+    /// let result = try await client.selectMoments(..., options: .with(typeBuilder: tbFFI))
+    /// ```
+    public func toFFI() throws -> TypeBuilderFFI {
+        let tbFFI = try TypeBuilderFFI()
+
+        // Copy all dynamic enum values to the FFI TypeBuilder
+        for (enumName, values) in dynamicEnumValues() {
+            let enumBuilder = try tbFFI.enumBuilder(enumName)
+            try enumBuilder.addValues(values)
+        }
+
+        return tbFFI
+    }
+}
+
+#endif // BAML_FFI_ENABLED

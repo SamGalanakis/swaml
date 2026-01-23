@@ -37,6 +37,8 @@ let runtime = await BamlRuntime.openRouter(
 
 ### FFI Runtime (BAML Rust Backend)
 
+> **Required:** BAML 0.218.0 or later
+
 For full BAML compatibility including `ctx.output_format`, streaming, and all BAML Rust runtime features, use the FFI runtime:
 
 ```swift
@@ -435,6 +437,11 @@ print(analysis.topics)
 - macOS 13+ / iOS 16+ / Linux
 
 ### FFI Runtime Additional Requirements
+
+**BAML Version:**
+- **BAML 0.218.0 or later** is required for FFI support
+- The BAML FFI library can be built from the [BAML repository](https://github.com/BoundaryML/baml)
+- Build the C FFI library from `engine/language_client_cffi`
 
 **Apple Platforms:**
 - Rust toolchain with iOS targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`
