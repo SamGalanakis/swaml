@@ -1,6 +1,6 @@
 import Foundation
 
-/// Pure Swift implementation of BAML's jsonish parser.
+/// Pure Swift implementation of SWAML's jsonish parser.
 ///
 /// Handles robust parsing of LLM output that may contain:
 /// - Trailing commas
@@ -20,7 +20,7 @@ public struct JsonishParser {
     /// - Parameter input: Raw LLM output
     /// - Parameter isDone: Whether the stream is complete (for streaming support)
     /// - Returns: Clean JSON string
-    /// - Throws: BamlError if no valid JSON can be extracted
+    /// - Throws: SwamlError if no valid JSON can be extracted
     public static func parse(_ input: String, isDone: Bool = true) throws -> String {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -45,7 +45,7 @@ public struct JsonishParser {
             return "{}"
         }
 
-        throw BamlError.parseError("Could not extract valid JSON from output: \(trimmed.prefix(200))")
+        throw SwamlError.parseError("Could not extract valid JSON from output: \(trimmed.prefix(200))")
     }
 
     /// Parse LLM output with streaming support

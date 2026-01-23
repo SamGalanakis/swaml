@@ -3,11 +3,11 @@ import Foundation
 /// High-level client for making structured LLM calls with Swift-native types.
 ///
 /// SwamlClient provides a simple API for getting typed responses from LLMs using
-/// the `BamlTyped` protocol for schema generation and output parsing.
+/// the `SwamlTyped` protocol for schema generation and output parsing.
 ///
 /// Example usage:
 /// ```swift
-/// @BamlType
+/// @SwamlType
 /// struct Sentiment {
 ///     @Description("Detected sentiment")
 ///     let sentiment: String
@@ -68,12 +68,12 @@ public actor SwamlClient {
     /// - Parameters:
     ///   - model: The model identifier (e.g., "openai/gpt-4o-mini")
     ///   - prompt: The user prompt
-    ///   - returnType: The expected return type (must conform to BamlTyped)
+    ///   - returnType: The expected return type (must conform to SwamlTyped)
     ///   - systemPrompt: Optional additional system prompt (prepended to schema)
     ///   - temperature: Optional temperature (0.0-2.0)
     ///   - maxTokens: Optional max tokens for response
     /// - Returns: Parsed and validated response of the expected type
-    public func call<T: BamlTyped>(
+    public func call<T: SwamlTyped>(
         model: String,
         prompt: String,
         returnType: T.Type,
@@ -109,7 +109,7 @@ public actor SwamlClient {
         )
 
         // 3. Parse with schema validation (use Rust parser if available)
-        return try parseResponse(response.content, schema: T.bamlSchema, type: T.self)
+        return try parseResponse(response.content, schema: T.swamlSchema, type: T.self)
     }
 
     /// Call an LLM with structured output and automatic error repair
@@ -120,13 +120,13 @@ public actor SwamlClient {
     /// - Parameters:
     ///   - model: The model identifier (e.g., "openai/gpt-4o-mini")
     ///   - prompt: The user prompt
-    ///   - returnType: The expected return type (must conform to BamlTyped)
+    ///   - returnType: The expected return type (must conform to SwamlTyped)
     ///   - systemPrompt: Optional additional system prompt
     ///   - temperature: Optional temperature (0.0-2.0)
     ///   - maxTokens: Optional max tokens for response
     ///   - maxRepairAttempts: Maximum repair attempts (default: 1)
     /// - Returns: Parsed and validated response of the expected type
-    public func callWithRepair<T: BamlTyped>(
+    public func callWithRepair<T: SwamlTyped>(
         model: String,
         prompt: String,
         returnType: T.Type,
@@ -144,7 +144,7 @@ public actor SwamlClient {
                 temperature: temperature,
                 maxTokens: maxTokens
             )
-        } catch let error as BamlError {
+        } catch let error as SwamlError {
             guard maxRepairAttempts > 0 else { throw error }
 
             // Extract raw output from error if available
@@ -163,12 +163,12 @@ public actor SwamlClient {
                 model: model,
                 originalPrompt: prompt,
                 malformedOutput: rawOutput,
-                expectedSchema: T.bamlSchema,
+                expectedSchema: T.swamlSchema,
                 temperature: temperature
             )
 
             // Retry parsing with repaired output
-            return try parseResponse(repaired, schema: T.bamlSchema, type: T.self)
+            return try parseResponse(repaired, schema: T.swamlSchema, type: T.self)
         }
     }
 
@@ -181,7 +181,7 @@ public actor SwamlClient {
     ///   - temperature: Optional temperature
     ///   - maxTokens: Optional max tokens
     /// - Returns: Parsed response
-    public func call<T: BamlTyped>(
+    public func call<T: SwamlTyped>(
         model: String,
         prompt: PromptBuilder,
         returnType: T.Type,
@@ -198,11 +198,11 @@ public actor SwamlClient {
             maxTokens: maxTokens
         )
 
-        return try parseResponse(response.content, schema: T.bamlSchema, type: T.self)
+        return try parseResponse(response.content, schema: T.swamlSchema, type: T.self)
     }
 
     /// Call an LLM with PromptBuilder and automatic error repair
-    public func callWithRepair<T: BamlTyped>(
+    public func callWithRepair<T: SwamlTyped>(
         model: String,
         prompt: PromptBuilder,
         returnType: T.Type,
@@ -218,7 +218,7 @@ public actor SwamlClient {
                 temperature: temperature,
                 maxTokens: maxTokens
             )
-        } catch let error as BamlError {
+        } catch let error as SwamlError {
             guard maxRepairAttempts > 0 else { throw error }
 
             let rawOutput: String
@@ -233,11 +233,11 @@ public actor SwamlClient {
                 model: model,
                 originalPrompt: prompt.buildRaw().compactMap { $0.content.textValue }.joined(separator: "\n"),
                 malformedOutput: rawOutput,
-                expectedSchema: T.bamlSchema,
+                expectedSchema: T.swamlSchema,
                 temperature: temperature
             )
 
-            return try parseResponse(repaired, schema: T.bamlSchema, type: T.self)
+            return try parseResponse(repaired, schema: T.swamlSchema, type: T.self)
         }
     }
 
@@ -251,7 +251,7 @@ public actor SwamlClient {
     ///   - temperature: Optional temperature
     ///   - maxTokens: Optional max tokens
     /// - Returns: Parsed response
-    public func call<T: BamlTyped>(
+    public func call<T: SwamlTyped>(
         model: String,
         messages: [ChatMessage],
         returnType: T.Type,
@@ -285,10 +285,10 @@ public actor SwamlClient {
             maxTokens: maxTokens
         )
 
-        return try parseResponse(response.content, schema: T.bamlSchema, type: T.self)
+        return try parseResponse(response.content, schema: T.swamlSchema, type: T.self)
     }
 
-    /// Call an LLM and return raw BamlValue (for dynamic schemas)
+    /// Call an LLM and return raw SwamlValue (for dynamic schemas)
     ///
     /// - Parameters:
     ///   - model: The model identifier
@@ -297,7 +297,7 @@ public actor SwamlClient {
     ///   - systemPrompt: Optional additional system prompt
     ///   - temperature: Optional temperature
     ///   - maxTokens: Optional max tokens
-    /// - Returns: Parsed BamlValue
+    /// - Returns: Parsed SwamlValue
     public func callDynamic(
         model: String,
         prompt: String,
@@ -305,7 +305,7 @@ public actor SwamlClient {
         systemPrompt: String? = nil,
         temperature: Double? = nil,
         maxTokens: Int? = nil
-    ) async throws -> BamlValue {
+    ) async throws -> SwamlValue {
         let schemaPrompt = SchemaPromptRenderer.render(
             schema: schema,
             typeBuilder: typeBuilder
@@ -342,20 +342,20 @@ public actor SwamlClient {
     /// Extend a dynamic enum at runtime
     ///
     /// - Parameters:
-    ///   - type: The enum type to extend (must be marked with @BamlDynamic)
+    ///   - type: The enum type to extend (must be marked with @SwamlDynamic)
     ///   - values: New values to add
-    /// - Throws: BamlError if the type is not dynamic
-    public func extendEnum<T: BamlTyped>(
+    /// - Throws: SwamlError if the type is not dynamic
+    public func extendEnum<T: SwamlTyped>(
         _ type: T.Type,
         with values: [String]
     ) throws {
         guard T.isDynamic else {
-            throw BamlError.configurationError(
-                "Cannot extend non-dynamic type '\(T.bamlTypeName)'. Add @BamlDynamic to allow runtime extension."
+            throw SwamlError.configurationError(
+                "Cannot extend non-dynamic type '\(T.swamlTypeName)'. Add @SwamlDynamic to allow runtime extension."
             )
         }
 
-        let builder = typeBuilder.enumBuilder(T.bamlTypeName)
+        let builder = typeBuilder.enumBuilder(T.swamlTypeName)
         for value in values {
             builder.addValue(value)
         }
@@ -364,22 +364,22 @@ public actor SwamlClient {
     /// Add a property to a dynamic class at runtime
     ///
     /// - Parameters:
-    ///   - type: The class type to extend (must be marked with @BamlDynamic)
+    ///   - type: The class type to extend (must be marked with @SwamlDynamic)
     ///   - propertyName: Name of the new property
     ///   - propertyType: Type of the new property
-    /// - Throws: BamlError if the type is not dynamic
-    public func extendClass<T: BamlTyped>(
+    /// - Throws: SwamlError if the type is not dynamic
+    public func extendClass<T: SwamlTyped>(
         _ type: T.Type,
         property propertyName: String,
         type propertyType: FieldType
     ) throws {
         guard T.isDynamic else {
-            throw BamlError.configurationError(
-                "Cannot extend non-dynamic type '\(T.bamlTypeName)'. Add @BamlDynamic to allow runtime extension."
+            throw SwamlError.configurationError(
+                "Cannot extend non-dynamic type '\(T.swamlTypeName)'. Add @SwamlDynamic to allow runtime extension."
             )
         }
 
-        let builder = typeBuilder.classBuilder(T.bamlTypeName)
+        let builder = typeBuilder.classBuilder(T.swamlTypeName)
         builder.addProperty(propertyName, propertyType)
     }
 
@@ -416,7 +416,7 @@ extension SwamlClient {
     ///   - temperature: Optional temperature
     ///   - maxConcurrency: Maximum concurrent requests (default: 5)
     /// - Returns: Array of results in the same order as prompts
-    public func batch<T: BamlTyped>(
+    public func batch<T: SwamlTyped>(
         model: String,
         prompts: [String],
         returnType: T.Type,
@@ -485,7 +485,7 @@ extension SwamlClient {
         // Parse with the Swift jsonish parser
         let parsedJSON = try JsonishParser.parse(response)
         guard let data = parsedJSON.data(using: .utf8) else {
-            throw BamlError.parseError("Failed to convert parsed JSON to data")
+            throw SwamlError.parseError("Failed to convert parsed JSON to data")
         }
 
         // Decode with schema coercion - try snake_case first, then raw

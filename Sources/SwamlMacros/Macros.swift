@@ -1,13 +1,13 @@
 import SWAML
 
-/// Swift macros for BAML type generation.
+/// Swift macros for SWAML type generation.
 ///
-/// These macros generate `BamlTyped` protocol conformance at compile time,
+/// These macros generate `SwamlTyped` protocol conformance at compile time,
 /// providing schema information for structured LLM output.
 ///
 /// Usage:
 /// ```swift
-/// @BamlType
+/// @SwamlType
 /// struct User {
 ///     @Description("The user's full name")
 ///     let name: String
@@ -18,27 +18,27 @@ import SWAML
 ///     let status: UserStatus
 /// }
 ///
-/// @BamlType
-/// @BamlDynamic  // Allows runtime extension via TypeBuilder
+/// @SwamlType
+/// @SwamlDynamic  // Allows runtime extension via TypeBuilder
 /// enum UserStatus: String {
 ///     case active
 ///     case inactive
 /// }
 /// ```
 
-// MARK: - BamlType Macro
+// MARK: - SwamlType Macro
 
-/// Generates `BamlTyped` protocol conformance for a struct or enum.
+/// Generates `SwamlTyped` protocol conformance for a struct or enum.
 ///
 /// The macro generates:
-/// - `bamlTypeName`: The type name as a string
-/// - `bamlSchema`: JSON Schema representation
+/// - `swamlTypeName`: The type name as a string
+/// - `swamlSchema`: JSON Schema representation
 /// - `fieldDescriptions`: Property descriptions from `@Description`
 /// - `isDynamic`: Whether the type can be extended at runtime
 ///
 /// Example:
 /// ```swift
-/// @BamlType
+/// @SwamlType
 /// struct Person {
 ///     let name: String
 ///     let age: Int
@@ -47,9 +47,9 @@ import SWAML
 ///
 /// Generates:
 /// ```swift
-/// extension Person: BamlTyped {
-///     static var bamlTypeName: String { "Person" }
-///     static var bamlSchema: JSONSchema {
+/// extension Person: SwamlTyped {
+///     static var swamlTypeName: String { "Person" }
+///     static var swamlSchema: JSONSchema {
 ///         .object()
 ///             .property("name", .string)
 ///             .property("age", .integer)
@@ -58,10 +58,10 @@ import SWAML
 ///     static var isDynamic: Bool { false }
 /// }
 /// ```
-@attached(extension, conformances: BamlTyped, names: named(bamlTypeName), named(bamlSchema), named(isDynamic), named(fieldDescriptions), named(fieldAliases))
-public macro BamlType() = #externalMacro(module: "SwamlMacrosPlugin", type: "BamlTypeMacro")
+@attached(extension, conformances: SwamlTyped, names: named(swamlTypeName), named(swamlSchema), named(isDynamic), named(fieldDescriptions), named(fieldAliases))
+public macro SwamlType() = #externalMacro(module: "SwamlMacrosPlugin", type: "SwamlTypeMacro")
 
-// MARK: - BamlDynamic Macro
+// MARK: - SwamlDynamic Macro
 
 /// Marks a type as dynamically extensible at runtime.
 ///
@@ -70,8 +70,8 @@ public macro BamlType() = #externalMacro(module: "SwamlMacrosPlugin", type: "Bam
 ///
 /// Example:
 /// ```swift
-/// @BamlType
-/// @BamlDynamic
+/// @SwamlType
+/// @SwamlDynamic
 /// enum Category: String {
 ///     case electronics
 ///     case clothing
@@ -82,9 +82,9 @@ public macro BamlType() = #externalMacro(module: "SwamlMacrosPlugin", type: "Bam
 /// try client.extendEnum(Category.self, with: ["furniture", "books"])
 /// ```
 ///
-/// Without `@BamlDynamic`, attempting to extend a type at runtime will throw an error.
+/// Without `@SwamlDynamic`, attempting to extend a type at runtime will throw an error.
 @attached(peer)
-public macro BamlDynamic() = #externalMacro(module: "SwamlMacrosPlugin", type: "BamlDynamicMacro")
+public macro SwamlDynamic() = #externalMacro(module: "SwamlMacrosPlugin", type: "SwamlDynamicMacro")
 
 // MARK: - Description Macro
 
@@ -95,7 +95,7 @@ public macro BamlDynamic() = #externalMacro(module: "SwamlMacrosPlugin", type: "
 ///
 /// Example:
 /// ```swift
-/// @BamlType
+/// @SwamlType
 /// struct Order {
 ///     @Description("Unique order identifier")
 ///     let orderId: String
@@ -128,7 +128,7 @@ public macro Description(_ description: String) = #externalMacro(module: "SwamlM
 ///
 /// Example:
 /// ```swift
-/// @BamlType
+/// @SwamlType
 /// struct User {
 ///     @Alias("user_name")
 ///     let userName: String

@@ -53,11 +53,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSwamlClientCall() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct SimpleResult: BamlTyped {
+        struct SimpleResult: SwamlTyped {
             let number: Int
 
-            static var bamlTypeName: String { "SimpleResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "SimpleResult" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["number": .integer], required: ["number"])
             }
         }
@@ -74,11 +74,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSwamlClientWithStringOutput() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct WordResult: BamlTyped {
+        struct WordResult: SwamlTyped {
             let word: String
 
-            static var bamlTypeName: String { "WordResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "WordResult" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["word": .string], required: ["word"])
             }
         }
@@ -95,11 +95,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSwamlClientWithArray() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct ListResult: BamlTyped {
+        struct ListResult: SwamlTyped {
             let items: [String]
 
-            static var bamlTypeName: String { "ListResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "ListResult" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["items": .array(items: .string)], required: ["items"])
             }
         }
@@ -116,12 +116,12 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSwamlClientWithOptional() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct OptionalResult: BamlTyped {
+        struct OptionalResult: SwamlTyped {
             let name: String
             let age: Int?
 
-            static var bamlTypeName: String { "OptionalResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "OptionalResult" }
+            static var swamlSchema: JSONSchema {
                 .object(
                     properties: [
                         "name": .string,
@@ -145,11 +145,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSwamlClientWithEnum() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct EnumResult: BamlTyped {
+        struct EnumResult: SwamlTyped {
             let color: String
 
-            static var bamlTypeName: String { "EnumResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "EnumResult" }
+            static var swamlSchema: JSONSchema {
                 .object(
                     properties: ["color": .enum(values: ["red", "green", "blue"])],
                     required: ["color"]
@@ -191,11 +191,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testSchemaPromptIncludedInRequest() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct BoolResult: BamlTyped {
+        struct BoolResult: SwamlTyped {
             let flag: Bool
 
-            static var bamlTypeName: String { "BoolResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "BoolResult" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["flag": .boolean], required: ["flag"])
             }
         }
@@ -215,11 +215,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testDynamicEnumExtension() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        enum DynamicStatus: String, BamlTyped {
+        enum DynamicStatus: String, SwamlTyped {
             case active
 
-            static var bamlTypeName: String { "DynamicStatus" }
-            static var bamlSchema: JSONSchema { .enum(values: ["active"]) }
+            static var swamlTypeName: String { "DynamicStatus" }
+            static var swamlSchema: JSONSchema { .enum(values: ["active"]) }
             static var isDynamic: Bool { true }
         }
 
@@ -227,7 +227,7 @@ final class OpenRouterIntegrationTests: XCTestCase {
         try await client.extendEnum(DynamicStatus.self, with: ["inactive", "pending"])
 
         // Verify the extension
-        let values = client.types.enumBuilder(DynamicStatus.bamlTypeName).allValues
+        let values = client.types.enumBuilder(DynamicStatus.swamlTypeName).allValues
         XCTAssertEqual(values, ["inactive", "pending"])
     }
 
@@ -236,10 +236,10 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testInvalidModelReturnsError() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct SimpleResult: BamlTyped {
+        struct SimpleResult: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "SimpleResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "SimpleResult" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["x": .integer], required: ["x"])
             }
         }
@@ -253,7 +253,7 @@ final class OpenRouterIntegrationTests: XCTestCase {
             XCTFail("Should have thrown an error")
         } catch {
             // Expected - invalid model should fail
-            XCTAssertTrue(error is BamlError)
+            XCTAssertTrue(error is SwamlError)
         }
     }
 
@@ -266,11 +266,11 @@ final class OpenRouterIntegrationTests: XCTestCase {
             let value: Int
         }
 
-        struct Outer: BamlTyped {
+        struct Outer: SwamlTyped {
             let inner: Inner
 
-            static var bamlTypeName: String { "Outer" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "Outer" }
+            static var swamlSchema: JSONSchema {
                 .object(
                     properties: [
                         "inner": .object(
@@ -297,13 +297,13 @@ final class OpenRouterIntegrationTests: XCTestCase {
     func testMultipleFields() async throws {
         let client = IntegrationTestConfig.createClient()!
 
-        struct Person: BamlTyped {
+        struct Person: SwamlTyped {
             let name: String
             let age: Int
             let active: Bool
 
-            static var bamlTypeName: String { "Person" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "Person" }
+            static var swamlSchema: JSONSchema {
                 .object(
                     properties: [
                         "name": .string,

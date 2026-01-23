@@ -13,18 +13,18 @@ final class TypeBuilderStrictTests: XCTestCase {
         XCTAssertFalse(tb.isDynamicType("NotRegistered"))
     }
 
-    func testRegisterDynamicTypeFromBamlTyped() {
-        enum DynamicEnum: String, BamlTyped {
+    func testRegisterDynamicTypeFromSwamlTyped() {
+        enum DynamicEnum: String, SwamlTyped {
             case a
-            static var bamlTypeName: String { "DynamicEnum" }
-            static var bamlSchema: JSONSchema { .enum(values: ["a"]) }
+            static var swamlTypeName: String { "DynamicEnum" }
+            static var swamlSchema: JSONSchema { .enum(values: ["a"]) }
             static var isDynamic: Bool { true }
         }
 
-        struct NonDynamicStruct: BamlTyped {
+        struct NonDynamicStruct: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "NonDynamicStruct" }
-            static var bamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
+            static var swamlTypeName: String { "NonDynamicStruct" }
+            static var swamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
         }
 
         let tb = TypeBuilder()
@@ -52,10 +52,10 @@ final class TypeBuilderStrictTests: XCTestCase {
     // MARK: - Typed Enum Builder
 
     func testEnumBuilderForDynamicType() throws {
-        enum DynamicEnum: String, BamlTyped {
+        enum DynamicEnum: String, SwamlTyped {
             case a
-            static var bamlTypeName: String { "DynamicEnum" }
-            static var bamlSchema: JSONSchema { .enum(values: ["a"]) }
+            static var swamlTypeName: String { "DynamicEnum" }
+            static var swamlSchema: JSONSchema { .enum(values: ["a"]) }
             static var isDynamic: Bool { true }
         }
 
@@ -72,10 +72,10 @@ final class TypeBuilderStrictTests: XCTestCase {
     }
 
     func testEnumBuilderForNonDynamicTypeFails() {
-        enum NonDynamicEnum: String, BamlTyped {
+        enum NonDynamicEnum: String, SwamlTyped {
             case a
-            static var bamlTypeName: String { "NonDynamicEnum" }
-            static var bamlSchema: JSONSchema { .enum(values: ["a"]) }
+            static var swamlTypeName: String { "NonDynamicEnum" }
+            static var swamlSchema: JSONSchema { .enum(values: ["a"]) }
             // isDynamic defaults to false
         }
 
@@ -93,10 +93,10 @@ final class TypeBuilderStrictTests: XCTestCase {
     // MARK: - Typed Class Builder
 
     func testClassBuilderForDynamicType() throws {
-        struct DynamicClass: BamlTyped {
+        struct DynamicClass: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "DynamicClass" }
-            static var bamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
+            static var swamlTypeName: String { "DynamicClass" }
+            static var swamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
             static var isDynamic: Bool { true }
         }
 
@@ -111,10 +111,10 @@ final class TypeBuilderStrictTests: XCTestCase {
     }
 
     func testClassBuilderForNonDynamicTypeFails() {
-        struct NonDynamicClass: BamlTyped {
+        struct NonDynamicClass: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "NonDynamicClass" }
-            static var bamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
+            static var swamlTypeName: String { "NonDynamicClass" }
+            static var swamlSchema: JSONSchema { .object(properties: ["x": .integer], required: ["x"]) }
         }
 
         let tb = TypeBuilder()
@@ -203,7 +203,7 @@ final class TypeBuilderStrictTests: XCTestCase {
     func testTypeNotDynamicErrorMessage() {
         let error = TypeBuilderError.typeNotDynamic("MyType")
         XCTAssertTrue(error.localizedDescription.contains("MyType"))
-        XCTAssertTrue(error.localizedDescription.contains("@BamlDynamic"))
+        XCTAssertTrue(error.localizedDescription.contains("@SwamlDynamic"))
     }
 
     func testTypeNotRegisteredErrorMessage() {

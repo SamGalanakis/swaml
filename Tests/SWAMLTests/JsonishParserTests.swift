@@ -248,13 +248,13 @@ final class JsonishParserTests: XCTestCase {
 
     func testNoJSONThrows() {
         XCTAssertThrowsError(try JsonishParser.parse("Hello, world!")) { error in
-            XCTAssertTrue(error is BamlError)
+            XCTAssertTrue(error is SwamlError)
         }
     }
 
     func testEmptyInputThrows() {
         XCTAssertThrowsError(try JsonishParser.parse("")) { error in
-            XCTAssertTrue(error is BamlError)
+            XCTAssertTrue(error is SwamlError)
         }
     }
 

@@ -1,14 +1,14 @@
 import Foundation
 
-/// A dynamic value type that can represent any BAML value
-public enum BamlValue: Sendable, Equatable {
+/// A dynamic value type that can represent any SWAML value
+public enum SwamlValue: Sendable, Equatable {
     case null
     case bool(Bool)
     case int(Int)
     case float(Double)
     case string(String)
-    case array([BamlValue])
-    case map([String: BamlValue])
+    case array([SwamlValue])
+    case map([String: SwamlValue])
 
     // MARK: - Convenience Initializers
 
@@ -16,8 +16,8 @@ public enum BamlValue: Sendable, Equatable {
     public init(_ value: Int) { self = .int(value) }
     public init(_ value: Double) { self = .float(value) }
     public init(_ value: String) { self = .string(value) }
-    public init(_ value: [BamlValue]) { self = .array(value) }
-    public init(_ value: [String: BamlValue]) { self = .map(value) }
+    public init(_ value: [SwamlValue]) { self = .array(value) }
+    public init(_ value: [String: SwamlValue]) { self = .map(value) }
 
     // MARK: - Type Checking
 
@@ -88,12 +88,12 @@ public enum BamlValue: Sendable, Equatable {
         return nil
     }
 
-    public var arrayValue: [BamlValue]? {
+    public var arrayValue: [SwamlValue]? {
         if case .array(let value) = self { return value }
         return nil
     }
 
-    public var mapValue: [String: BamlValue]? {
+    public var mapValue: [String: SwamlValue]? {
         if case .map(let value) = self { return value }
         return nil
     }
@@ -101,7 +101,7 @@ public enum BamlValue: Sendable, Equatable {
     // MARK: - Subscript Access
 
     /// Access array element by index
-    public subscript(index: Int) -> BamlValue? {
+    public subscript(index: Int) -> SwamlValue? {
         guard case .array(let array) = self, index >= 0, index < array.count else {
             return nil
         }
@@ -109,7 +109,7 @@ public enum BamlValue: Sendable, Equatable {
     }
 
     /// Access map value by key
-    public subscript(key: String) -> BamlValue? {
+    public subscript(key: String) -> SwamlValue? {
         guard case .map(let map) = self else { return nil }
         return map[key]
     }
@@ -137,7 +137,7 @@ public enum BamlValue: Sendable, Equatable {
     }
 
     /// Create from a JSON-compatible Any value
-    public static func fromJSON(_ value: Any) -> BamlValue {
+    public static func fromJSON(_ value: Any) -> SwamlValue {
         switch value {
         case is NSNull:
             return .null
@@ -203,15 +203,15 @@ public enum BamlValue: Sendable, Equatable {
             options: prettyPrint ? [.prettyPrinted, .sortedKeys] : []
         )
         guard let string = String(data: data, encoding: .utf8) else {
-            throw BamlError.internalError("Failed to convert JSON data to string")
+            throw SwamlError.internalError("Failed to convert JSON data to string")
         }
         return string
     }
 
     /// Parse from JSON string
-    public static func fromJSONString(_ json: String) throws -> BamlValue {
+    public static func fromJSONString(_ json: String) throws -> SwamlValue {
         guard let data = json.data(using: .utf8) else {
-            throw BamlError.parseError("Invalid UTF-8 string")
+            throw SwamlError.parseError("Invalid UTF-8 string")
         }
         let value = try JSONSerialization.jsonObject(with: data)
         return fromJSON(value)
@@ -220,7 +220,7 @@ public enum BamlValue: Sendable, Equatable {
 
 // MARK: - Codable
 
-extension BamlValue: Codable {
+extension SwamlValue: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
 
@@ -234,12 +234,12 @@ extension BamlValue: Codable {
             self = .float(double)
         } else if let string = try? container.decode(String.self) {
             self = .string(string)
-        } else if let array = try? container.decode([BamlValue].self) {
+        } else if let array = try? container.decode([SwamlValue].self) {
             self = .array(array)
-        } else if let dict = try? container.decode([String: BamlValue].self) {
+        } else if let dict = try? container.decode([String: SwamlValue].self) {
             self = .map(dict)
         } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unable to decode BamlValue")
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unable to decode SwamlValue")
         }
     }
 
@@ -266,51 +266,51 @@ extension BamlValue: Codable {
 
 // MARK: - ExpressibleBy Protocols
 
-extension BamlValue: ExpressibleByNilLiteral {
+extension SwamlValue: ExpressibleByNilLiteral {
     public init(nilLiteral: ()) {
         self = .null
     }
 }
 
-extension BamlValue: ExpressibleByBooleanLiteral {
+extension SwamlValue: ExpressibleByBooleanLiteral {
     public init(booleanLiteral value: Bool) {
         self = .bool(value)
     }
 }
 
-extension BamlValue: ExpressibleByIntegerLiteral {
+extension SwamlValue: ExpressibleByIntegerLiteral {
     public init(integerLiteral value: Int) {
         self = .int(value)
     }
 }
 
-extension BamlValue: ExpressibleByFloatLiteral {
+extension SwamlValue: ExpressibleByFloatLiteral {
     public init(floatLiteral value: Double) {
         self = .float(value)
     }
 }
 
-extension BamlValue: ExpressibleByStringLiteral {
+extension SwamlValue: ExpressibleByStringLiteral {
     public init(stringLiteral value: String) {
         self = .string(value)
     }
 }
 
-extension BamlValue: ExpressibleByArrayLiteral {
-    public init(arrayLiteral elements: BamlValue...) {
+extension SwamlValue: ExpressibleByArrayLiteral {
+    public init(arrayLiteral elements: SwamlValue...) {
         self = .array(elements)
     }
 }
 
-extension BamlValue: ExpressibleByDictionaryLiteral {
-    public init(dictionaryLiteral elements: (String, BamlValue)...) {
+extension SwamlValue: ExpressibleByDictionaryLiteral {
+    public init(dictionaryLiteral elements: (String, SwamlValue)...) {
         self = .map(Dictionary(uniqueKeysWithValues: elements))
     }
 }
 
 // MARK: - CustomStringConvertible
 
-extension BamlValue: CustomStringConvertible {
+extension SwamlValue: CustomStringConvertible {
     public var description: String {
         switch self {
         case .null:

@@ -263,9 +263,9 @@ final class IntegrationTests: XCTestCase {
         }
     }
 
-    // MARK: - BamlValue Dynamic Access
+    // MARK: - SwamlValue Dynamic Access
 
-    func testBamlValueDynamicAccess() throws {
+    func testSwamlValueDynamicAccess() throws {
         let json = #"""
         {
             "contact_animal": "Wolf",
@@ -278,7 +278,7 @@ final class IntegrationTests: XCTestCase {
         }
         """#
 
-        let value = try BamlValue.fromJSONString(json)
+        let value = try SwamlValue.fromJSONString(json)
 
         // Access string
         XCTAssertEqual(value["contact_animal"]?.stringValue, "Wolf")

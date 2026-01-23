@@ -5,11 +5,11 @@ import XCTest
 #if canImport(SwamlMacrosPlugin)
 @testable import SwamlMacrosPlugin
 
-final class BamlTypeMacroTests: XCTestCase {
+final class SwamlTypeMacroTests: XCTestCase {
 
     let testMacros: [String: Macro.Type] = [
-        "BamlType": BamlTypeMacro.self,
-        "BamlDynamic": BamlDynamicMacro.self,
+        "BamlType": SwamlTypeMacro.self,
+        "BamlDynamic": SwamlDynamicMacro.self,
         "Description": DescriptionMacro.self,
         "Alias": AliasMacro.self,
     ]
@@ -19,7 +19,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testSimpleStruct() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             struct User {
                 let name: String
                 let age: Int
@@ -31,9 +31,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 let age: Int
             }
 
-            extension User: BamlTyped {
-                public static var bamlTypeName: String { "User" }
-                public static var bamlSchema: JSONSchema {
+            extension User: SwamlTyped {
+                public static var swamlTypeName: String { "User" }
+                public static var swamlSchema: JSONSchema {
                     .object(properties: ["age": .integer, "name": .string], required: ["age", "name"])
                 }
                 public static var isDynamic: Bool { false }
@@ -48,7 +48,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testStructWithOptional() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             struct Profile {
                 let username: String
                 let bio: String?
@@ -60,9 +60,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 let bio: String?
             }
 
-            extension Profile: BamlTyped {
-                public static var bamlTypeName: String { "Profile" }
-                public static var bamlSchema: JSONSchema {
+            extension Profile: SwamlTyped {
+                public static var swamlTypeName: String { "Profile" }
+                public static var swamlSchema: JSONSchema {
                     .object(properties: ["bio": .anyOf([.string, .null]), "username": .string], required: ["username"])
                 }
                 public static var isDynamic: Bool { false }
@@ -77,7 +77,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testStructWithDescriptions() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             struct Order {
                 @Description("Unique order ID")
                 let orderId: String
@@ -93,9 +93,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 let totalCents: Int
             }
 
-            extension Order: BamlTyped {
-                public static var bamlTypeName: String { "Order" }
-                public static var bamlSchema: JSONSchema {
+            extension Order: SwamlTyped {
+                public static var swamlTypeName: String { "Order" }
+                public static var swamlSchema: JSONSchema {
                     .object(properties: ["orderId": .string, "totalCents": .integer], required: ["orderId", "totalCents"])
                 }
                 public static var isDynamic: Bool { false }
@@ -112,7 +112,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testSimpleEnum() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             enum Status: String {
                 case active
                 case inactive
@@ -124,9 +124,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 case inactive
             }
 
-            extension Status: BamlTyped {
-                public static var bamlTypeName: String { "Status" }
-                public static var bamlSchema: JSONSchema { .enum(values: ["active", "inactive"]) }
+            extension Status: SwamlTyped {
+                public static var swamlTypeName: String { "Status" }
+                public static var swamlSchema: JSONSchema { .enum(values: ["active", "inactive"]) }
                 public static var isDynamic: Bool { false }
                 public static var fieldDescriptions: [String: String] { [:] }
                 public static var fieldAliases: [String: String] { [:] }
@@ -139,8 +139,8 @@ final class BamlTypeMacroTests: XCTestCase {
     func testDynamicEnum() throws {
         assertMacroExpansion(
             """
-            @BamlType
-            @BamlDynamic
+            @SwamlType
+            @SwamlDynamic
             enum Category: String {
                 case electronics
                 case clothing
@@ -152,9 +152,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 case clothing
             }
 
-            extension Category: BamlTyped {
-                public static var bamlTypeName: String { "Category" }
-                public static var bamlSchema: JSONSchema { .enum(values: ["electronics", "clothing"]) }
+            extension Category: SwamlTyped {
+                public static var swamlTypeName: String { "Category" }
+                public static var swamlSchema: JSONSchema { .enum(values: ["electronics", "clothing"]) }
                 public static var isDynamic: Bool { true }
                 public static var fieldDescriptions: [String: String] { [:] }
                 public static var fieldAliases: [String: String] { [:] }
@@ -169,7 +169,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testStructWithArray() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             struct Team {
                 let name: String
                 let members: [String]
@@ -181,9 +181,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 let members: [String]
             }
 
-            extension Team: BamlTyped {
-                public static var bamlTypeName: String { "Team" }
-                public static var bamlSchema: JSONSchema {
+            extension Team: SwamlTyped {
+                public static var swamlTypeName: String { "Team" }
+                public static var swamlSchema: JSONSchema {
                     .object(properties: ["members": .array(items: .string), "name": .string], required: ["members", "name"])
                 }
                 public static var isDynamic: Bool { false }
@@ -200,7 +200,7 @@ final class BamlTypeMacroTests: XCTestCase {
     func testStructWithTypeReference() throws {
         assertMacroExpansion(
             """
-            @BamlType
+            @SwamlType
             struct User {
                 let name: String
                 let status: UserStatus
@@ -212,9 +212,9 @@ final class BamlTypeMacroTests: XCTestCase {
                 let status: UserStatus
             }
 
-            extension User: BamlTyped {
-                public static var bamlTypeName: String { "User" }
-                public static var bamlSchema: JSONSchema {
+            extension User: SwamlTyped {
+                public static var swamlTypeName: String { "User" }
+                public static var swamlSchema: JSONSchema {
                     .object(properties: ["name": .string, "status": .ref("UserStatus")], required: ["name", "status"])
                 }
                 public static var isDynamic: Bool { false }

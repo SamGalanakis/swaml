@@ -54,8 +54,8 @@ public struct RetryPolicy: Sendable {
     public func shouldRetry(error: Error, attempt: Int) -> Bool {
         guard attempt < maxRetries else { return false }
 
-        if let bamlError = error as? BamlError {
-            switch bamlError {
+        if let swamlError = error as? SwamlError {
+            switch swamlError {
             case .apiError(let statusCode, _):
                 return retryableStatusCodes.contains(statusCode)
             case .networkError:
@@ -122,7 +122,7 @@ public struct RetryExecutor {
             }
         }
 
-        throw BamlError.retryLimitExceeded(
+        throw SwamlError.retryLimitExceeded(
             attempts: policy.maxRetries + 1,
             lastError: lastError?.localizedDescription ?? "Unknown error"
         )

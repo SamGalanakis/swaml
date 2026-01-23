@@ -54,16 +54,16 @@ final class RetryPolicyTests: XCTestCase {
     func testShouldRetryOnRateLimitError() {
         let policy = RetryPolicy.standard
 
-        let error = BamlError.apiError(statusCode: 429, message: "Rate limited")
+        let error = SwamlError.apiError(statusCode: 429, message: "Rate limited")
         XCTAssertTrue(policy.shouldRetry(error: error, attempt: 0))
     }
 
     func testShouldRetryOnServerError() {
         let policy = RetryPolicy.standard
 
-        let error500 = BamlError.apiError(statusCode: 500, message: "Internal error")
-        let error502 = BamlError.apiError(statusCode: 502, message: "Bad gateway")
-        let error503 = BamlError.apiError(statusCode: 503, message: "Service unavailable")
+        let error500 = SwamlError.apiError(statusCode: 500, message: "Internal error")
+        let error502 = SwamlError.apiError(statusCode: 502, message: "Bad gateway")
+        let error503 = SwamlError.apiError(statusCode: 503, message: "Service unavailable")
 
         XCTAssertTrue(policy.shouldRetry(error: error500, attempt: 0))
         XCTAssertTrue(policy.shouldRetry(error: error502, attempt: 0))
@@ -73,9 +73,9 @@ final class RetryPolicyTests: XCTestCase {
     func testShouldNotRetryOnClientError() {
         let policy = RetryPolicy.standard
 
-        let error400 = BamlError.apiError(statusCode: 400, message: "Bad request")
-        let error401 = BamlError.apiError(statusCode: 401, message: "Unauthorized")
-        let error404 = BamlError.apiError(statusCode: 404, message: "Not found")
+        let error400 = SwamlError.apiError(statusCode: 400, message: "Bad request")
+        let error401 = SwamlError.apiError(statusCode: 401, message: "Unauthorized")
+        let error404 = SwamlError.apiError(statusCode: 404, message: "Not found")
 
         XCTAssertFalse(policy.shouldRetry(error: error400, attempt: 0))
         XCTAssertFalse(policy.shouldRetry(error: error401, attempt: 0))
@@ -85,21 +85,21 @@ final class RetryPolicyTests: XCTestCase {
     func testShouldRetryOnNetworkError() {
         let policy = RetryPolicy.standard
 
-        let error = BamlError.networkError("Connection failed")
+        let error = SwamlError.networkError("Connection failed")
         XCTAssertTrue(policy.shouldRetry(error: error, attempt: 0))
     }
 
     func testShouldNotRetryOnParseError() {
         let policy = RetryPolicy.standard
 
-        let error = BamlError.parseError("Invalid JSON")
+        let error = SwamlError.parseError("Invalid JSON")
         XCTAssertFalse(policy.shouldRetry(error: error, attempt: 0))
     }
 
     func testShouldNotRetryAfterMaxAttempts() {
         let policy = RetryPolicy(maxRetries: 3)
 
-        let error = BamlError.apiError(statusCode: 500, message: "Server error")
+        let error = SwamlError.apiError(statusCode: 500, message: "Server error")
 
         XCTAssertTrue(policy.shouldRetry(error: error, attempt: 0))
         XCTAssertTrue(policy.shouldRetry(error: error, attempt: 1))
@@ -114,7 +114,7 @@ final class RetryPolicyTests: XCTestCase {
 
         XCTAssertEqual(policy.maxRetries, 0)
 
-        let error = BamlError.apiError(statusCode: 500, message: "Error")
+        let error = SwamlError.apiError(statusCode: 500, message: "Error")
         XCTAssertFalse(policy.shouldRetry(error: error, attempt: 0))
     }
 

@@ -82,7 +82,7 @@ final class JSONExtractorTests: XCTestCase {
         {"outer": {"inner": {"deep": "value"}}}
         """
         let extracted = try JSONExtractor.extract(from: input)
-        let value = try BamlValue.fromJSONString(extracted)
+        let value = try SwamlValue.fromJSONString(extracted)
 
         XCTAssertEqual(value["outer"]?["inner"]?["deep"]?.stringValue, "value")
     }
@@ -93,7 +93,7 @@ final class JSONExtractorTests: XCTestCase {
         let input = "This is just plain text with no JSON."
 
         XCTAssertThrowsError(try JSONExtractor.extract(from: input)) { error in
-            guard case BamlError.jsonExtractionError = error else {
+            guard case SwamlError.jsonExtractionError = error else {
                 XCTFail("Expected jsonExtractionError")
                 return
             }

@@ -4,8 +4,8 @@ import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import Foundation
 
-/// Macro that generates BamlTyped conformance for structs and enums
-public struct BamlTypeMacro: ExtensionMacro {
+/// Macro that generates SwamlTyped conformance for structs and enums
+public struct SwamlTypeMacro: ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
@@ -19,7 +19,7 @@ public struct BamlTypeMacro: ExtensionMacro {
         } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
             return try expandEnum(enumDecl, type: type, context: context)
         } else {
-            throw MacroError.message("@BamlType can only be applied to structs and enums")
+            throw MacroError.message("@SwamlType can only be applied to structs and enums")
         }
     }
 
@@ -83,10 +83,10 @@ public struct BamlTypeMacro: ExtensionMacro {
             }
         }
 
-        // Check for @BamlDynamic attribute
+        // Check for @SwamlDynamic attribute
         let isDynamic = structDecl.attributes.contains { attr in
             guard let attrSyntax = attr.as(AttributeSyntax.self) else { return false }
-            return attrSyntax.attributeName.description.trimmingCharacters(in: .whitespaces) == "BamlDynamic"
+            return attrSyntax.attributeName.description.trimmingCharacters(in: .whitespaces) == "SwamlDynamic"
         }
 
         // Build schema code
@@ -99,9 +99,9 @@ public struct BamlTypeMacro: ExtensionMacro {
         let aliasesCode = buildDictionaryLiteral(aliases)
 
         let extensionDecl: DeclSyntax = """
-        extension \(raw: typeName): BamlTyped {
-            public static var bamlTypeName: String { "\(raw: typeName)" }
-            public static var bamlSchema: JSONSchema {
+        extension \(raw: typeName): SwamlTyped {
+            public static var swamlTypeName: String { "\(raw: typeName)" }
+            public static var swamlSchema: JSONSchema {
                 \(raw: schemaCode)
             }
             public static var isDynamic: Bool { \(raw: isDynamic ? "true" : "false") }
@@ -151,10 +151,10 @@ public struct BamlTypeMacro: ExtensionMacro {
             }
         }
 
-        // Check for @BamlDynamic attribute
+        // Check for @SwamlDynamic attribute
         let isDynamic = enumDecl.attributes.contains { attr in
             guard let attrSyntax = attr.as(AttributeSyntax.self) else { return false }
-            return attrSyntax.attributeName.description.trimmingCharacters(in: .whitespaces) == "BamlDynamic"
+            return attrSyntax.attributeName.description.trimmingCharacters(in: .whitespaces) == "SwamlDynamic"
         }
 
         // Build schema code
@@ -163,9 +163,9 @@ public struct BamlTypeMacro: ExtensionMacro {
         let descriptionsCode = buildDictionaryLiteral(descriptions)
 
         let extensionDecl: DeclSyntax = """
-        extension \(raw: typeName): BamlTyped {
-            public static var bamlTypeName: String { "\(raw: typeName)" }
-            public static var bamlSchema: JSONSchema { .enum(values: [\(raw: enumValues)]) }
+        extension \(raw: typeName): SwamlTyped {
+            public static var swamlTypeName: String { "\(raw: typeName)" }
+            public static var swamlSchema: JSONSchema { .enum(values: [\(raw: enumValues)]) }
             public static var isDynamic: Bool { \(raw: isDynamic ? "true" : "false") }
             public static var fieldDescriptions: [String: String] { \(raw: descriptionsCode) }
             public static var fieldAliases: [String: String] { [:] }

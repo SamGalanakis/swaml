@@ -1,31 +1,31 @@
 import XCTest
 @testable import SWAML
 
-final class BamlValueTests: XCTestCase {
+final class SwamlValueTests: XCTestCase {
 
     // MARK: - Basic Types
 
     func testStringValue() {
-        let value: BamlValue = "hello"
+        let value: SwamlValue = "hello"
         XCTAssertTrue(value.isString)
         XCTAssertEqual(value.stringValue, "hello")
     }
 
     func testIntValue() {
-        let value: BamlValue = 42
+        let value: SwamlValue = 42
         XCTAssertTrue(value.isInt)
         XCTAssertEqual(value.intValue, 42)
     }
 
     func testFloatValue() {
-        let value: BamlValue = 3.14
+        let value: SwamlValue = 3.14
         XCTAssertTrue(value.isFloat)
         XCTAssertEqual(value.doubleValue, 3.14)
     }
 
     func testBoolValue() {
-        let trueValue: BamlValue = true
-        let falseValue: BamlValue = false
+        let trueValue: SwamlValue = true
+        let falseValue: SwamlValue = false
 
         XCTAssertTrue(trueValue.isBool)
         XCTAssertEqual(trueValue.boolValue, true)
@@ -33,14 +33,14 @@ final class BamlValueTests: XCTestCase {
     }
 
     func testNullValue() {
-        let value: BamlValue = nil
+        let value: SwamlValue = nil
         XCTAssertTrue(value.isNull)
     }
 
     // MARK: - Collections
 
     func testArrayValue() {
-        let value: BamlValue = [1, 2, 3]
+        let value: SwamlValue = [1, 2, 3]
         XCTAssertTrue(value.isArray)
         XCTAssertEqual(value.arrayValue?.count, 3)
         XCTAssertEqual(value[0]?.intValue, 1)
@@ -49,7 +49,7 @@ final class BamlValueTests: XCTestCase {
     }
 
     func testMapValue() {
-        let value: BamlValue = ["name": "Alice", "age": 30]
+        let value: SwamlValue = ["name": "Alice", "age": 30]
         XCTAssertTrue(value.isMap)
         XCTAssertEqual(value["name"]?.stringValue, "Alice")
         XCTAssertEqual(value["age"]?.intValue, 30)
@@ -58,7 +58,7 @@ final class BamlValueTests: XCTestCase {
     // MARK: - JSON Conversion
 
     func testToJSONString() throws {
-        let value: BamlValue = ["name": "Bob", "scores": [1, 2, 3]]
+        let value: SwamlValue = ["name": "Bob", "scores": [1, 2, 3]]
         let json = try value.toJSONString()
 
         XCTAssertTrue(json.contains("\"name\""))
@@ -70,7 +70,7 @@ final class BamlValueTests: XCTestCase {
         let json = """
         {"name": "Charlie", "age": 25, "active": true}
         """
-        let value = try BamlValue.fromJSONString(json)
+        let value = try SwamlValue.fromJSONString(json)
 
         XCTAssertEqual(value["name"]?.stringValue, "Charlie")
         XCTAssertEqual(value["age"]?.intValue, 25)
@@ -80,7 +80,7 @@ final class BamlValueTests: XCTestCase {
     // MARK: - Codable
 
     func testCodableRoundTrip() throws {
-        let original: BamlValue = [
+        let original: SwamlValue = [
             "string": "hello",
             "int": 42,
             "float": 3.14,
@@ -94,7 +94,7 @@ final class BamlValueTests: XCTestCase {
         let data = try encoder.encode(original)
 
         let decoder = JSONDecoder()
-        let decoded = try decoder.decode(BamlValue.self, from: data)
+        let decoded = try decoder.decode(SwamlValue.self, from: data)
 
         XCTAssertEqual(original, decoded)
     }
@@ -102,12 +102,12 @@ final class BamlValueTests: XCTestCase {
     // MARK: - Type Coercion
 
     func testIntToDouble() {
-        let value: BamlValue = 42
+        let value: SwamlValue = 42
         XCTAssertEqual(value.doubleValue, 42.0)
     }
 
     func testDoubleToInt() {
-        let value: BamlValue = 42.0
+        let value: SwamlValue = 42.0
         XCTAssertEqual(value.intValue, 42)
     }
 }

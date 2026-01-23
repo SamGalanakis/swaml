@@ -4,8 +4,8 @@ import SwiftSyntaxMacros
 @main
 struct SwamlMacrosPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
-        BamlTypeMacro.self,
-        BamlDynamicMacro.self,
+        SwamlTypeMacro.self,
+        SwamlDynamicMacro.self,
         DescriptionMacro.self,
         AliasMacro.self,
     ]

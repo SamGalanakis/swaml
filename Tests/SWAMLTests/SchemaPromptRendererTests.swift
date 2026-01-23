@@ -277,14 +277,14 @@ final class SchemaPromptRendererTests: XCTestCase {
         XCTAssertTrue(result.contains("\"admin\" | \"user\""))
     }
 
-    // MARK: - BamlTyped Rendering
+    // MARK: - SwamlTyped Rendering
 
-    func testRenderForCustomBamlTyped() {
-        struct TestType: BamlTyped {
+    func testRenderForCustomSwamlTyped() {
+        struct TestType: SwamlTyped {
             let value: Int
 
-            static var bamlTypeName: String { "TestType" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "TestType" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["value": .integer], required: ["value"])
             }
             static var fieldDescriptions: [String: String] {
@@ -300,11 +300,11 @@ final class SchemaPromptRendererTests: XCTestCase {
     }
 
     func testRenderWithoutDescriptions() {
-        struct DescribedType: BamlTyped {
+        struct DescribedType: SwamlTyped {
             let x: Int
 
-            static var bamlTypeName: String { "DescribedType" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "DescribedType" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["x": .integer], required: ["x"])
             }
             static var fieldDescriptions: [String: String] {

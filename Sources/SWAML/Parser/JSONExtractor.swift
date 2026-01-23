@@ -23,7 +23,7 @@ public struct JSONExtractor {
             return extracted
         }
 
-        throw BamlError.jsonExtractionError("Could not find valid JSON in output")
+        throw SwamlError.jsonExtractionError("Could not find valid JSON in output")
     }
 
     /// Extract from markdown code block (```json ... ``` or ``` ... ```)

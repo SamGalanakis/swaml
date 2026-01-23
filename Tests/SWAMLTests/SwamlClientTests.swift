@@ -55,28 +55,28 @@ final class SwamlClientTests: XCTestCase {
 
     func testExtendEnumDynamicSucceeds() async throws {
         // Create a dynamic type for testing
-        enum DynamicTestEnum: String, BamlTyped {
+        enum DynamicTestEnum: String, SwamlTyped {
             case a, b
 
-            static var bamlTypeName: String { "DynamicTestEnum" }
-            static var bamlSchema: JSONSchema { .enum(values: ["a", "b"]) }
+            static var swamlTypeName: String { "DynamicTestEnum" }
+            static var swamlSchema: JSONSchema { .enum(values: ["a", "b"]) }
             static var isDynamic: Bool { true }
         }
 
         let client = SwamlClient(provider: .openAI(apiKey: "test"))
         try await client.extendEnum(DynamicTestEnum.self, with: ["c", "d"])
 
-        let values = client.types.enumBuilder(DynamicTestEnum.bamlTypeName).allValues
+        let values = client.types.enumBuilder(DynamicTestEnum.swamlTypeName).allValues
         XCTAssertEqual(values, ["c", "d"])
     }
 
     // MARK: - Extend Class Tests
 
     func testExtendClassNonDynamicFails() async {
-        struct NonDynamicClass: BamlTyped {
+        struct NonDynamicClass: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "NonDynamicClass" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "NonDynamicClass" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["x": .integer], required: ["x"])
             }
         }
@@ -92,10 +92,10 @@ final class SwamlClientTests: XCTestCase {
     }
 
     func testExtendClassDynamicSucceeds() async throws {
-        struct DynamicClass: BamlTyped {
+        struct DynamicClass: SwamlTyped {
             let x: Int
-            static var bamlTypeName: String { "DynamicClass" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "DynamicClass" }
+            static var swamlSchema: JSONSchema {
                 .object(properties: ["x": .integer], required: ["x"])
             }
             static var isDynamic: Bool { true }
@@ -105,7 +105,7 @@ final class SwamlClientTests: XCTestCase {
         try await client.extendClass(DynamicClass.self, property: "y", type: .string)
         try await client.extendClass(DynamicClass.self, property: "z", type: .bool)
 
-        let classBuilder = client.types.classBuilder(DynamicClass.bamlTypeName)
+        let classBuilder = client.types.classBuilder(DynamicClass.swamlTypeName)
         XCTAssertTrue(classBuilder.hasProperty("y"))
         XCTAssertTrue(classBuilder.hasProperty("z"))
     }
@@ -115,15 +115,15 @@ final class SwamlClientTests: XCTestCase {
 
 final class SwamlClientSchemaTests: XCTestCase {
 
-    func testBamlTypedPrimitivesGenerateCorrectSchema() {
-        XCTAssertEqual(String.bamlSchema, .string)
-        XCTAssertEqual(Int.bamlSchema, .integer)
-        XCTAssertEqual(Double.bamlSchema, .number)
-        XCTAssertEqual(Bool.bamlSchema, .boolean)
+    func testSwamlTypedPrimitivesGenerateCorrectSchema() {
+        XCTAssertEqual(String.swamlSchema, .string)
+        XCTAssertEqual(Int.swamlSchema, .integer)
+        XCTAssertEqual(Double.swamlSchema, .number)
+        XCTAssertEqual(Bool.swamlSchema, .boolean)
     }
 
     func testArrayGeneratesCorrectSchema() {
-        let schema = [String].bamlSchema
+        let schema = [String].swamlSchema
         if case .array(let items) = schema {
             XCTAssertEqual(items, .string)
         } else {
@@ -132,7 +132,7 @@ final class SwamlClientSchemaTests: XCTestCase {
     }
 
     func testOptionalGeneratesCorrectSchema() {
-        let schema = Int?.bamlSchema
+        let schema = Int?.swamlSchema
         if case .anyOf(let schemas) = schema {
             XCTAssertEqual(schemas.count, 2)
             XCTAssertTrue(schemas.contains(.integer))
@@ -143,7 +143,7 @@ final class SwamlClientSchemaTests: XCTestCase {
     }
 
     func testDictionaryGeneratesCorrectSchema() {
-        let schema = [String: Int].bamlSchema
+        let schema = [String: Int].swamlSchema
         if case .object(_, _, let additionalProperties) = schema {
             XCTAssertEqual(additionalProperties, .integer)
         } else {

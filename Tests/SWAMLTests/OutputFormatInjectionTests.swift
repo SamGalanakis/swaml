@@ -9,12 +9,12 @@ final class OutputFormatInjectionTests: XCTestCase {
 
     // MARK: - Test Types
 
-    struct SimpleSentiment: BamlTyped, Codable {
+    struct SimpleSentiment: SwamlTyped, Codable {
         let sentiment: String
         let confidence: Double
 
-        static var bamlTypeName: String { "SimpleSentiment" }
-        static var bamlSchema: JSONSchema {
+        static var swamlTypeName: String { "SimpleSentiment" }
+        static var swamlSchema: JSONSchema {
             .object(
                 properties: [
                     "sentiment": .string,
@@ -28,13 +28,13 @@ final class OutputFormatInjectionTests: XCTestCase {
         }
     }
 
-    struct IssueClassification: BamlTyped, Codable {
+    struct IssueClassification: SwamlTyped, Codable {
         let category: String
         let priority: String
         let tags: [String]
 
-        static var bamlTypeName: String { "IssueClassification" }
-        static var bamlSchema: JSONSchema {
+        static var swamlTypeName: String { "IssueClassification" }
+        static var swamlSchema: JSONSchema {
             .object(
                 properties: [
                     "category": .enum(values: ["bug", "feature", "docs"]),
@@ -46,7 +46,7 @@ final class OutputFormatInjectionTests: XCTestCase {
         }
     }
 
-    struct NestedAnalysis: BamlTyped, Codable {
+    struct NestedAnalysis: SwamlTyped, Codable {
         let summary: String
         let details: Details
 
@@ -55,8 +55,8 @@ final class OutputFormatInjectionTests: XCTestCase {
             let notes: [String]
         }
 
-        static var bamlTypeName: String { "NestedAnalysis" }
-        static var bamlSchema: JSONSchema {
+        static var swamlTypeName: String { "NestedAnalysis" }
+        static var swamlSchema: JSONSchema {
             .object(
                 properties: [
                     "summary": .string,
@@ -400,12 +400,12 @@ final class OutputFormatInjectionTests: XCTestCase {
     }
 
     func testExamplesAndOutputFormatTogether() {
-        struct ExampleResult: BamlTyped, Codable {
+        struct ExampleResult: SwamlTyped, Codable {
             let label: String
             let score: Double
 
-            static var bamlTypeName: String { "ExampleResult" }
-            static var bamlSchema: JSONSchema {
+            static var swamlTypeName: String { "ExampleResult" }
+            static var swamlSchema: JSONSchema {
                 .object(
                     properties: ["label": .string, "score": .number],
                     required: ["label", "score"]

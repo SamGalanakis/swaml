@@ -2,7 +2,7 @@ import Foundation
 
 /// A builder for constructing LLM prompts with type-safe variable substitution.
 ///
-/// PromptBuilder replaces .baml file templates with a Swift-native DSL for
+/// PromptBuilder replaces .swaml file templates with a Swift-native DSL for
 /// building prompts. It supports:
 /// - System and user prompt templates
 /// - Variable substitution ({{ variable_name }} syntax)
@@ -137,7 +137,7 @@ public struct PromptBuilder: Sendable {
     ///   - typeBuilder: Optional TypeBuilder for dynamic types
     ///   - includeDescriptions: Whether to include field descriptions in schema
     /// - Returns: Array of ChatMessage ready for LLM call
-    public func build<T: BamlTyped>(
+    public func build<T: SwamlTyped>(
         returnType: T.Type,
         typeBuilder: TypeBuilder? = nil,
         includeDescriptions: Bool = true
@@ -284,7 +284,7 @@ extension PromptBuilder {
 
 extension ChatMessage {
     /// Create a ChatMessage array from a PromptBuilder
-    public static func from<T: BamlTyped>(
+    public static func from<T: SwamlTyped>(
         _ builder: PromptBuilder,
         returnType: T.Type,
         typeBuilder: TypeBuilder? = nil

@@ -2,16 +2,16 @@ import Foundation
 
 // MARK: - TypeBuilder Core
 
-/// Build types dynamically at runtime for use with BAML functions.
+/// Build types dynamically at runtime for use with SWAML functions.
 /// This is the base class - generated code will create a subclass with
 /// specific enum/class accessors.
 open class TypeBuilder: @unchecked Sendable {
     private let lock = NSLock()
 
-    /// Known class names from BAML schema
+    /// Known class names from SWAML schema
     public let knownClasses: Set<String>
 
-    /// Known enum names from BAML schema
+    /// Known enum names from SWAML schema
     public let knownEnums: Set<String>
 
     /// Dynamic enum builders (for @@dynamic enums)
@@ -23,7 +23,7 @@ open class TypeBuilder: @unchecked Sendable {
     /// Registered dynamic types (types that can be extended at runtime)
     private var dynamicTypes: Set<String> = []
 
-    /// Initialize with known types from the BAML schema
+    /// Initialize with known types from the SWAML schema
     public init(classes: Set<String> = [], enums: Set<String> = []) {
         self.knownClasses = classes
         self.knownEnums = enums
@@ -34,17 +34,17 @@ open class TypeBuilder: @unchecked Sendable {
     /// Register a type as dynamically extensible
     ///
     /// Only types registered as dynamic can be extended at runtime.
-    /// Types marked with `@BamlDynamic` are automatically registered.
+    /// Types marked with `@SwamlDynamic` are automatically registered.
     public func registerDynamicType(_ name: String) {
         lock.lock()
         defer { lock.unlock() }
         dynamicTypes.insert(name)
     }
 
-    /// Register a BamlTyped type as dynamic (if it declares isDynamic = true)
-    public func registerDynamicType<T: BamlTyped>(_ type: T.Type) {
+    /// Register a SwamlTyped type as dynamic (if it declares isDynamic = true)
+    public func registerDynamicType<T: SwamlTyped>(_ type: T.Type) {
         if T.isDynamic {
-            registerDynamicType(T.bamlTypeName)
+            registerDynamicType(T.swamlTypeName)
         }
     }
 
@@ -160,34 +160,34 @@ open class TypeBuilder: @unchecked Sendable {
 
     // MARK: - Strict Dynamic Type Extension
 
-    /// Get or create a dynamic enum builder for a BamlTyped enum type
+    /// Get or create a dynamic enum builder for a SwamlTyped enum type
     ///
     /// This method validates that the type is marked as dynamic before allowing extension.
-    /// - Parameter type: The BamlTyped enum type to extend
+    /// - Parameter type: The SwamlTyped enum type to extend
     /// - Returns: A builder for adding values to the enum
-    /// - Throws: TypeBuilderError.typeNotDynamic if the type is not marked with @BamlDynamic
-    public func enumBuilder<T: BamlTyped>(for type: T.Type) throws -> DynamicEnumBuilder {
+    /// - Throws: TypeBuilderError.typeNotDynamic if the type is not marked with @SwamlDynamic
+    public func enumBuilder<T: SwamlTyped>(for type: T.Type) throws -> DynamicEnumBuilder {
         guard T.isDynamic else {
-            throw TypeBuilderError.typeNotDynamic(T.bamlTypeName)
+            throw TypeBuilderError.typeNotDynamic(T.swamlTypeName)
         }
         // Auto-register when using typed API
-        registerDynamicType(T.bamlTypeName)
-        return enumBuilder(T.bamlTypeName)
+        registerDynamicType(T.swamlTypeName)
+        return enumBuilder(T.swamlTypeName)
     }
 
-    /// Get or create a dynamic class builder for a BamlTyped class type
+    /// Get or create a dynamic class builder for a SwamlTyped class type
     ///
     /// This method validates that the type is marked as dynamic before allowing extension.
-    /// - Parameter type: The BamlTyped class type to extend
+    /// - Parameter type: The SwamlTyped class type to extend
     /// - Returns: A builder for adding properties to the class
-    /// - Throws: TypeBuilderError.typeNotDynamic if the type is not marked with @BamlDynamic
-    public func classBuilder<T: BamlTyped>(for type: T.Type) throws -> DynamicClassBuilder {
+    /// - Throws: TypeBuilderError.typeNotDynamic if the type is not marked with @SwamlDynamic
+    public func classBuilder<T: SwamlTyped>(for type: T.Type) throws -> DynamicClassBuilder {
         guard T.isDynamic else {
-            throw TypeBuilderError.typeNotDynamic(T.bamlTypeName)
+            throw TypeBuilderError.typeNotDynamic(T.swamlTypeName)
         }
         // Auto-register when using typed API
-        registerDynamicType(T.bamlTypeName)
-        return classBuilder(T.bamlTypeName)
+        registerDynamicType(T.swamlTypeName)
+        return classBuilder(T.swamlTypeName)
     }
 
     /// Extend an enum with strict validation
@@ -338,7 +338,7 @@ public enum TypeBuilderError: Error, LocalizedError {
         case .serializationFailed:
             return "Failed to serialize TypeBuilder to JSON"
         case .typeNotDynamic(let name):
-            return "Cannot extend non-dynamic type '\(name)'. Add @BamlDynamic to allow runtime extension."
+            return "Cannot extend non-dynamic type '\(name)'. Add @SwamlDynamic to allow runtime extension."
         case .typeNotRegistered(let name):
             return "Type '\(name)' is not registered for dynamic extension"
         }
@@ -692,7 +692,7 @@ public class StaticEnumViewer: @unchecked Sendable {
     /// Name of the enum
     public let name: String
 
-    /// Values defined in the BAML schema
+    /// Values defined in the SWAML schema
     public let values: [EnumValue]
 
     private let valueSet: Set<String>

@@ -94,12 +94,12 @@ public actor LLMClient {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw BamlError.networkError("Invalid response type")
+            throw SwamlError.networkError("Invalid response type")
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw BamlError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
+            throw SwamlError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
         let decoder = JSONDecoder()
@@ -107,7 +107,7 @@ public actor LLMClient {
 
         guard let choice = apiResponse.choices.first,
               let content = choice.message.content else {
-            throw BamlError.parseError("No content in response")
+            throw SwamlError.parseError("No content in response")
         }
 
         return LLMResponse(
@@ -200,12 +200,12 @@ public actor LLMClient {
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw BamlError.networkError("Invalid response type")
+            throw SwamlError.networkError("Invalid response type")
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw BamlError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
+            throw SwamlError.apiError(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
         let decoder = JSONDecoder()

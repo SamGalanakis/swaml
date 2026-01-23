@@ -1,7 +1,7 @@
 import Foundation
 
-/// Core BAML runtime for executing functions
-public actor BamlRuntime {
+/// Core SWAML runtime for executing functions
+public actor SwamlRuntime {
     public let clientRegistry: ClientRegistry
     public let defaultRetryPolicy: RetryPolicy
 
@@ -13,25 +13,25 @@ public actor BamlRuntime {
         self.defaultRetryPolicy = defaultRetryPolicy
     }
 
-    /// Call a BAML function with the given arguments
+    /// Call a SWAML function with the given arguments
     public func callFunction(
         _ name: String,
-        args: [String: BamlValue],
+        args: [String: SwamlValue],
         prompt: String,
         outputSchema: JSONSchema? = nil,
         typeBuilder: TypeBuilder? = nil,
         ctx: RuntimeContext = .default
-    ) async throws -> BamlValue {
+    ) async throws -> SwamlValue {
         // Get the client configuration
         let clientConfig: ClientConfig
         if let clientName = ctx.clientName {
             guard let config = await clientRegistry.getConfig(clientName) else {
-                throw BamlError.clientNotFound(clientName)
+                throw SwamlError.clientNotFound(clientName)
             }
             clientConfig = config
         } else {
             guard let config = await clientRegistry.getDefaultConfig() else {
-                throw BamlError.configurationError("No default client configured")
+                throw SwamlError.configurationError("No default client configured")
             }
             clientConfig = config
         }
@@ -80,7 +80,7 @@ public actor BamlRuntime {
     /// Call a function with typed output
     public func callFunction<T: Codable>(
         _ name: String,
-        args: [String: BamlValue],
+        args: [String: SwamlValue],
         prompt: String,
         outputSchema: JSONSchema? = nil,
         outputType: T.Type,
@@ -91,12 +91,12 @@ public actor BamlRuntime {
         let clientConfig: ClientConfig
         if let clientName = ctx.clientName {
             guard let config = await clientRegistry.getConfig(clientName) else {
-                throw BamlError.clientNotFound(clientName)
+                throw SwamlError.clientNotFound(clientName)
             }
             clientConfig = config
         } else {
             guard let config = await clientRegistry.getDefaultConfig() else {
-                throw BamlError.configurationError("No default client configured")
+                throw SwamlError.configurationError("No default client configured")
             }
             clientConfig = config
         }
@@ -154,12 +154,12 @@ public actor BamlRuntime {
         let clientConfig: ClientConfig
         if let name = clientName {
             guard let config = await clientRegistry.getConfig(name) else {
-                throw BamlError.clientNotFound(name)
+                throw SwamlError.clientNotFound(name)
             }
             clientConfig = config
         } else {
             guard let config = await clientRegistry.getDefaultConfig() else {
-                throw BamlError.configurationError("No default client configured")
+                throw SwamlError.configurationError("No default client configured")
             }
             clientConfig = config
         }
@@ -231,9 +231,9 @@ public actor BamlRuntime {
 
 // MARK: - Convenience Initializers
 
-extension BamlRuntime {
+extension SwamlRuntime {
     /// Create a runtime with a single OpenRouter client
-    public static func openRouter(apiKey: String, model: String) async -> BamlRuntime {
+    public static func openRouter(apiKey: String, model: String) async -> SwamlRuntime {
         let registry = ClientRegistry()
         await registry.register(
             name: "default",
@@ -241,11 +241,11 @@ extension BamlRuntime {
             model: model,
             isDefault: true
         )
-        return BamlRuntime(clientRegistry: registry)
+        return SwamlRuntime(clientRegistry: registry)
     }
 
     /// Create a runtime with a single OpenAI client
-    public static func openAI(apiKey: String, model: String = "gpt-4o") async -> BamlRuntime {
+    public static func openAI(apiKey: String, model: String = "gpt-4o") async -> SwamlRuntime {
         let registry = ClientRegistry()
         await registry.register(
             name: "default",
@@ -253,11 +253,11 @@ extension BamlRuntime {
             model: model,
             isDefault: true
         )
-        return BamlRuntime(clientRegistry: registry)
+        return SwamlRuntime(clientRegistry: registry)
     }
 
     /// Create a runtime with a single Anthropic client
-    public static func anthropic(apiKey: String, model: String = "claude-sonnet-4-20250514") async -> BamlRuntime {
+    public static func anthropic(apiKey: String, model: String = "claude-sonnet-4-20250514") async -> SwamlRuntime {
         let registry = ClientRegistry()
         await registry.register(
             name: "default",
@@ -265,6 +265,6 @@ extension BamlRuntime {
             model: model,
             isDefault: true
         )
-        return BamlRuntime(clientRegistry: registry)
+        return SwamlRuntime(clientRegistry: registry)
     }
 }

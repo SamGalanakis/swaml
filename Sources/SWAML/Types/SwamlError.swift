@@ -1,7 +1,7 @@
 import Foundation
 
-/// Errors that can occur during BAML operations
-public enum BamlError: Error, LocalizedError, Sendable {
+/// Errors that can occur during SWAML operations
+public enum SwamlError: Error, LocalizedError, Sendable {
     /// Network-related error
     case networkError(String)
 
@@ -66,7 +66,7 @@ public enum BamlError: Error, LocalizedError, Sendable {
         case .internalError(let message):
             return "Internal error: \(message)"
         case .runtimeCreationFailed(let message):
-            return "Failed to create BAML runtime: \(message)"
+            return "Failed to create SWAML runtime: \(message)"
         case .ffiError(let message):
             return "FFI error: \(message)"
         }

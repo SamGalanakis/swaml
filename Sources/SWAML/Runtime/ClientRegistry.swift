@@ -81,7 +81,7 @@ public actor ClientRegistry {
         }
 
         guard let config = clients[name] else {
-            throw BamlError.clientNotFound(name)
+            throw SwamlError.clientNotFound(name)
         }
 
         let client = LLMClient(provider: config.provider)
@@ -92,7 +92,7 @@ public actor ClientRegistry {
     /// Get the default LLMClient
     public func getDefaultClient() throws -> LLMClient {
         guard let name = defaultClientName else {
-            throw BamlError.configurationError("No default client configured")
+            throw SwamlError.configurationError("No default client configured")
         }
         return try getClient(name)
     }
@@ -100,7 +100,7 @@ public actor ClientRegistry {
     /// Set the default client
     public func setDefault(_ name: String) throws {
         guard clients[name] != nil else {
-            throw BamlError.clientNotFound(name)
+            throw SwamlError.clientNotFound(name)
         }
         defaultClientName = name
     }

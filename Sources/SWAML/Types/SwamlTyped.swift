@@ -1,19 +1,19 @@
 import Foundation
 
-/// Protocol for types that can be used with BAML structured output.
+/// Protocol for types that can be used with SWAML structured output.
 /// Conforming types provide compile-time type information for schema generation
 /// and LLM output parsing.
 ///
-/// Types can conform manually or use the `@BamlType` macro for automatic conformance.
+/// Types can conform manually or use the `@SwamlType` macro for automatic conformance.
 ///
 /// Example manual conformance:
 /// ```swift
-/// struct User: BamlTyped {
+/// struct User: SwamlTyped {
 ///     let name: String
 ///     let age: Int
 ///
-///     static var bamlTypeName: String { "User" }
-///     static var bamlSchema: JSONSchema {
+///     static var swamlTypeName: String { "User" }
+///     static var swamlSchema: JSONSchema {
 ///         .object()
 ///             .property("name", .string)
 ///             .property("age", .integer)
@@ -21,15 +21,15 @@ import Foundation
 ///     }
 /// }
 /// ```
-public protocol BamlTyped: Codable, Sendable {
-    /// The BAML type name (used in schema references)
-    static var bamlTypeName: String { get }
+public protocol SwamlTyped: Codable, Sendable {
+    /// The SWAML type name (used in schema references)
+    static var swamlTypeName: String { get }
 
     /// JSON Schema for this type
-    static var bamlSchema: JSONSchema { get }
+    static var swamlSchema: JSONSchema { get }
 
     /// Whether this type can be extended at runtime with TypeBuilder.
-    /// Only types marked with `@BamlDynamic` return true.
+    /// Only types marked with `@SwamlDynamic` return true.
     static var isDynamic: Bool { get }
 
     /// Field descriptions for documentation and schema generation.
@@ -43,7 +43,7 @@ public protocol BamlTyped: Codable, Sendable {
 
 // MARK: - Default Implementations
 
-extension BamlTyped {
+extension SwamlTyped {
     /// By default, types are not dynamic (cannot be extended at runtime)
     public static var isDynamic: Bool { false }
 
@@ -56,54 +56,54 @@ extension BamlTyped {
 
 // MARK: - Primitive Type Conformance
 
-extension String: BamlTyped {
-    public static var bamlTypeName: String { "string" }
-    public static var bamlSchema: JSONSchema { .string }
+extension String: SwamlTyped {
+    public static var swamlTypeName: String { "string" }
+    public static var swamlSchema: JSONSchema { .string }
 }
 
-extension Int: BamlTyped {
-    public static var bamlTypeName: String { "int" }
-    public static var bamlSchema: JSONSchema { .integer }
+extension Int: SwamlTyped {
+    public static var swamlTypeName: String { "int" }
+    public static var swamlSchema: JSONSchema { .integer }
 }
 
-extension Double: BamlTyped {
-    public static var bamlTypeName: String { "float" }
-    public static var bamlSchema: JSONSchema { .number }
+extension Double: SwamlTyped {
+    public static var swamlTypeName: String { "float" }
+    public static var swamlSchema: JSONSchema { .number }
 }
 
-extension Float: BamlTyped {
-    public static var bamlTypeName: String { "float" }
-    public static var bamlSchema: JSONSchema { .number }
+extension Float: SwamlTyped {
+    public static var swamlTypeName: String { "float" }
+    public static var swamlSchema: JSONSchema { .number }
 }
 
-extension Bool: BamlTyped {
-    public static var bamlTypeName: String { "bool" }
-    public static var bamlSchema: JSONSchema { .boolean }
+extension Bool: SwamlTyped {
+    public static var swamlTypeName: String { "bool" }
+    public static var swamlSchema: JSONSchema { .boolean }
 }
 
 // MARK: - Collection Type Conformance
 
-extension Array: BamlTyped where Element: BamlTyped {
-    public static var bamlTypeName: String { "[\(Element.bamlTypeName)]" }
-    public static var bamlSchema: JSONSchema { .array(items: Element.bamlSchema) }
+extension Array: SwamlTyped where Element: SwamlTyped {
+    public static var swamlTypeName: String { "[\(Element.swamlTypeName)]" }
+    public static var swamlSchema: JSONSchema { .array(items: Element.swamlSchema) }
 }
 
-extension Optional: BamlTyped where Wrapped: BamlTyped {
-    public static var bamlTypeName: String { "\(Wrapped.bamlTypeName)?" }
-    public static var bamlSchema: JSONSchema { .anyOf([Wrapped.bamlSchema, .null]) }
+extension Optional: SwamlTyped where Wrapped: SwamlTyped {
+    public static var swamlTypeName: String { "\(Wrapped.swamlTypeName)?" }
+    public static var swamlSchema: JSONSchema { .anyOf([Wrapped.swamlSchema, .null]) }
 }
 
-extension Dictionary: BamlTyped where Key == String, Value: BamlTyped {
-    public static var bamlTypeName: String { "map<string, \(Value.bamlTypeName)>" }
-    public static var bamlSchema: JSONSchema {
-        .object(properties: [:], required: [], additionalProperties: Value.bamlSchema)
+extension Dictionary: SwamlTyped where Key == String, Value: SwamlTyped {
+    public static var swamlTypeName: String { "map<string, \(Value.swamlTypeName)>" }
+    public static var swamlSchema: JSONSchema {
+        .object(properties: [:], required: [], additionalProperties: Value.swamlSchema)
     }
 }
 
 // MARK: - Type Information Helper
 
-/// Provides runtime type information for BamlTyped types
-public struct BamlTypeInfo: Sendable {
+/// Provides runtime type information for SwamlTyped types
+public struct SwamlTypeInfo: Sendable {
     /// The type name
     public let name: String
 
@@ -119,10 +119,10 @@ public struct BamlTypeInfo: Sendable {
     /// Field aliases
     public let fieldAliases: [String: String]
 
-    /// Create type info from a BamlTyped type
-    public init<T: BamlTyped>(for type: T.Type) {
-        self.name = T.bamlTypeName
-        self.schema = T.bamlSchema
+    /// Create type info from a SwamlTyped type
+    public init<T: SwamlTyped>(for type: T.Type) {
+        self.name = T.swamlTypeName
+        self.schema = T.swamlSchema
         self.isDynamic = T.isDynamic
         self.fieldDescriptions = T.fieldDescriptions
         self.fieldAliases = T.fieldAliases
@@ -147,25 +147,25 @@ public struct BamlTypeInfo: Sendable {
 // MARK: - Dynamic Type Registration
 
 /// Registry for dynamic type information that can be extended at runtime
-public final class BamlTypeRegistry: @unchecked Sendable {
+public final class SwamlTypeRegistry: @unchecked Sendable {
     private let lock = NSLock()
-    private var dynamicTypes: [String: BamlTypeInfo] = [:]
+    private var dynamicTypes: [String: SwamlTypeInfo] = [:]
     private var typeExtensions: [String: [String]] = [:]  // enum name -> additional values
 
     /// Shared instance
-    public static let shared = BamlTypeRegistry()
+    public static let shared = SwamlTypeRegistry()
 
     private init() {}
 
     /// Register a dynamic type
-    public func register<T: BamlTyped>(_ type: T.Type) {
+    public func register<T: SwamlTyped>(_ type: T.Type) {
         lock.lock()
         defer { lock.unlock() }
-        dynamicTypes[T.bamlTypeName] = BamlTypeInfo(for: type)
+        dynamicTypes[T.swamlTypeName] = SwamlTypeInfo(for: type)
     }
 
     /// Get type info for a registered type
-    public func typeInfo(for name: String) -> BamlTypeInfo? {
+    public func typeInfo(for name: String) -> SwamlTypeInfo? {
         lock.lock()
         defer { lock.unlock() }
         return dynamicTypes[name]
@@ -184,12 +184,12 @@ public final class BamlTypeRegistry: @unchecked Sendable {
         defer { lock.unlock() }
 
         guard let info = dynamicTypes[name] else {
-            throw BamlError.configurationError("Type '\(name)' is not registered")
+            throw SwamlError.configurationError("Type '\(name)' is not registered")
         }
 
         guard info.isDynamic else {
-            throw BamlError.configurationError(
-                "Cannot extend non-dynamic type '\(name)'. Add @BamlDynamic to allow runtime extension."
+            throw SwamlError.configurationError(
+                "Cannot extend non-dynamic type '\(name)'. Add @SwamlDynamic to allow runtime extension."
             )
         }
 
@@ -213,3 +213,4 @@ public final class BamlTypeRegistry: @unchecked Sendable {
         typeExtensions.removeAll()
     }
 }
+

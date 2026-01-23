@@ -2,7 +2,7 @@ import Foundation
 
 /// Renders schema prompts that instruct LLMs how to format structured output.
 ///
-/// The renderer generates human-readable schema descriptions in BAML's format
+/// The renderer generates human-readable schema descriptions in SWAML's format
 /// that LLMs understand well.
 ///
 /// Example output:
@@ -19,20 +19,20 @@ public struct SchemaPromptRenderer {
 
     // MARK: - Public API
 
-    /// Render a schema prompt for a BamlTyped type
+    /// Render a schema prompt for a SwamlTyped type
     ///
-    /// Uses BAML's exact output format:
+    /// Uses SWAML's exact output format:
     /// - Objects: "Answer in JSON using this schema:\n{...}"
     /// - Enums: "Answer with any of the categories:\n..."
     /// - Primitives: "Answer as an int", "Answer as a float", etc.
     /// - Arrays: "Answer with a JSON Array using this schema:\n..."
-    public static func render<T: BamlTyped>(
+    public static func render<T: SwamlTyped>(
         for type: T.Type,
         typeBuilder: TypeBuilder? = nil,
         includeDescriptions: Bool = true
     ) -> String {
         renderFullPrompt(
-            schema: T.bamlSchema,
+            schema: T.swamlSchema,
             descriptions: includeDescriptions ? T.fieldDescriptions : [:],
             typeBuilder: typeBuilder
         )
@@ -307,7 +307,7 @@ public struct SchemaPromptRenderer {
     }
 
     /// Render a prompt with examples
-    public static func renderWithExamples<T: BamlTyped>(
+    public static func renderWithExamples<T: SwamlTyped>(
         for type: T.Type,
         examples: [T],
         typeBuilder: TypeBuilder? = nil

@@ -15,18 +15,18 @@ public struct OutputParser {
         // Get JSON data for decoding
         let data: Data
         if let schema = schema {
-            // Parse to BamlValue for coercion
-            var bamlValue = try BamlValue.fromJSONString(jsonString)
-            bamlValue = try applySchemaCoercion(bamlValue, schema: schema)
-            let coercedJSON = try bamlValue.toJSONString()
+            // Parse to SwamlValue for coercion
+            var swamlValue = try SwamlValue.fromJSONString(jsonString)
+            swamlValue = try applySchemaCoercion(swamlValue, schema: schema)
+            let coercedJSON = try swamlValue.toJSONString()
             guard let d = coercedJSON.data(using: .utf8) else {
-                throw BamlError.parseError("Failed to convert to UTF-8")
+                throw SwamlError.parseError("Failed to convert to UTF-8")
             }
             data = d
         } else {
-            // Decode directly without going through BamlValue
+            // Decode directly without going through SwamlValue
             guard let d = jsonString.data(using: .utf8) else {
-                throw BamlError.parseError("Failed to convert to UTF-8")
+                throw SwamlError.parseError("Failed to convert to UTF-8")
             }
             data = d
         }
@@ -42,22 +42,22 @@ public struct OutputParser {
                 let decoder = JSONDecoder()
                 return try decoder.decode(T.self, from: data)
             } catch let error2 {
-                throw BamlError.parseError("Failed to decode \(T.self): \(error2.localizedDescription)")
+                throw SwamlError.parseError("Failed to decode \(T.self): \(error2.localizedDescription)")
             }
         }
     }
 
-    /// Parse raw output to BamlValue with schema validation
-    public static func parseToValue(_ output: String, schema: JSONSchema? = nil) throws -> BamlValue {
+    /// Parse raw output to SwamlValue with schema validation
+    public static func parseToValue(_ output: String, schema: JSONSchema? = nil) throws -> SwamlValue {
         let jsonString = try JSONExtractor.extract(from: output)
-        var bamlValue = try BamlValue.fromJSONString(jsonString)
+        var swamlValue = try SwamlValue.fromJSONString(jsonString)
 
         if let schema = schema {
-            bamlValue = try applySchemaCoercion(bamlValue, schema: schema)
-            try validateAgainstSchema(bamlValue, schema: schema)
+            swamlValue = try applySchemaCoercion(swamlValue, schema: schema)
+            try validateAgainstSchema(swamlValue, schema: schema)
         }
 
-        return bamlValue
+        return swamlValue
     }
 
     /// Parse with repair attempts for malformed JSON
@@ -80,7 +80,7 @@ public struct OutputParser {
 
     // MARK: - Schema Coercion
 
-    private static func applySchemaCoercion(_ value: BamlValue, schema: JSONSchema) throws -> BamlValue {
+    private static func applySchemaCoercion(_ value: SwamlValue, schema: JSONSchema) throws -> SwamlValue {
         switch schema {
         case .string:
             return try TypeCoercion.coerce(value, to: FieldType.string)
@@ -94,16 +94,16 @@ public struct OutputParser {
             if value.isNull {
                 return value
             }
-            throw BamlError.typeCoercionError(expected: "null", actual: value.typeName)
+            throw SwamlError.typeCoercionError(expected: "null", actual: value.typeName)
         case .array(let items):
             guard case .array(let elements) = value else {
-                throw BamlError.typeCoercionError(expected: "array", actual: value.typeName)
+                throw SwamlError.typeCoercionError(expected: "array", actual: value.typeName)
             }
             let coercedElements = try elements.map { try applySchemaCoercion($0, schema: items) }
             return .array(coercedElements)
         case .object(let properties, _, _):
             guard case .map(var dict) = value else {
-                throw BamlError.typeCoercionError(expected: "object", actual: value.typeName)
+                throw SwamlError.typeCoercionError(expected: "object", actual: value.typeName)
             }
             for (key, propSchema) in properties {
                 if let propValue = dict[key] {
@@ -124,49 +124,49 @@ public struct OutputParser {
                     return coerced
                 }
             }
-            throw BamlError.schemaValidationError("Value doesn't match any schema in anyOf")
+            throw SwamlError.schemaValidationError("Value doesn't match any schema in anyOf")
         }
     }
 
     // MARK: - Schema Validation
 
-    private static func validateAgainstSchema(_ value: BamlValue, schema: JSONSchema) throws {
+    private static func validateAgainstSchema(_ value: SwamlValue, schema: JSONSchema) throws {
         switch schema {
         case .string:
             guard value.isString else {
-                throw BamlError.schemaValidationError("Expected string, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected string, got \(value.typeName)")
             }
         case .integer:
             guard value.isInt else {
-                throw BamlError.schemaValidationError("Expected integer, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected integer, got \(value.typeName)")
             }
         case .number:
             guard value.isNumber else {
-                throw BamlError.schemaValidationError("Expected number, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected number, got \(value.typeName)")
             }
         case .boolean:
             guard value.isBool else {
-                throw BamlError.schemaValidationError("Expected boolean, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected boolean, got \(value.typeName)")
             }
         case .null:
             guard value.isNull else {
-                throw BamlError.schemaValidationError("Expected null, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected null, got \(value.typeName)")
             }
         case .array(let items):
             guard let elements = value.arrayValue else {
-                throw BamlError.schemaValidationError("Expected array, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected array, got \(value.typeName)")
             }
             for element in elements {
                 try validateAgainstSchema(element, schema: items)
             }
         case .object(let properties, let required, _):
             guard let dict = value.mapValue else {
-                throw BamlError.schemaValidationError("Expected object, got \(value.typeName)")
+                throw SwamlError.schemaValidationError("Expected object, got \(value.typeName)")
             }
             // Check required properties
             for reqKey in required {
                 guard dict[reqKey] != nil else {
-                    throw BamlError.schemaValidationError("Missing required property: \(reqKey)")
+                    throw SwamlError.schemaValidationError("Missing required property: \(reqKey)")
                 }
             }
             // Validate property types
@@ -177,10 +177,10 @@ public struct OutputParser {
             }
         case .enum(let values):
             guard let stringValue = value.stringValue else {
-                throw BamlError.schemaValidationError("Enum value must be a string")
+                throw SwamlError.schemaValidationError("Enum value must be a string")
             }
             guard values.contains(stringValue) else {
-                throw BamlError.schemaValidationError("Invalid enum value: \(stringValue). Expected one of: \(values.joined(separator: ", "))")
+                throw SwamlError.schemaValidationError("Invalid enum value: \(stringValue). Expected one of: \(values.joined(separator: ", "))")
             }
         case .ref:
             // Reference validation happens at schema resolution time
@@ -194,7 +194,7 @@ public struct OutputParser {
                 }
             }
             if !valid {
-                throw BamlError.schemaValidationError("Value doesn't match any schema in anyOf")
+                throw SwamlError.schemaValidationError("Value doesn't match any schema in anyOf")
             }
         }
     }
@@ -217,14 +217,14 @@ extension OutputParser {
         if trimmed == "false" || trimmed == "no" || trimmed == "0" {
             return false
         }
-        throw BamlError.parseError("Cannot parse '\(output)' as boolean")
+        throw SwamlError.parseError("Cannot parse '\(output)' as boolean")
     }
 
     /// Parse an integer value
     public static func parseInt(_ output: String) throws -> Int {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Int(trimmed) else {
-            throw BamlError.parseError("Cannot parse '\(output)' as integer")
+            throw SwamlError.parseError("Cannot parse '\(output)' as integer")
         }
         return value
     }
@@ -233,7 +233,7 @@ extension OutputParser {
     public static func parseFloat(_ output: String) throws -> Double {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(trimmed) else {
-            throw BamlError.parseError("Cannot parse '\(output)' as float")
+            throw SwamlError.parseError("Cannot parse '\(output)' as float")
         }
         return value
     }
