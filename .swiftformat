@@ -1,0 +1,34 @@
+# SwiftFormat configuration for SWAML
+
+# Swift version
+--swiftversion 5.9
+
+# Indentation
+--indent 4
+--tabwidth 4
+--smarttabs enabled
+
+# Wrapping
+--maxwidth 120
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+
+# Braces
+--allman false
+
+# Spacing
+--nospaceoperators ..<,...
+--operatorfunc spaced
+
+# Other
+--self remove
+--importgrouping alpha
+--semicolons never
+--commas always
+--trimwhitespace always
+--stripunusedargs closure-only
+
+# Disable rules that conflict with project style
+--disable redundantSelf
+--disable trailingCommas

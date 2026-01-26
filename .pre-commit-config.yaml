@@ -1,0 +1,43 @@
+# Pre-commit hooks for SWAML
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Swift formatting
+  - repo: https://github.com/nicklockwood/SwiftFormat
+    rev: 0.54.6
+    hooks:
+      - id: swiftformat
+        args: ['--swiftversion', '5.9']
+
+  # Local hooks for Swift
+  - repo: local
+    hooks:
+      # Build check
+      - id: swift-build
+        name: swift build
+        entry: swift build
+        language: system
+        types: [swift]
+        pass_filenames: false
+
+      # Test check (optional - can be slow)
+      # - id: swift-test
+      #   name: swift test
+      #   entry: swift test
+      #   language: system
+      #   types: [swift]
+      #   pass_filenames: false
